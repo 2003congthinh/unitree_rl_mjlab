@@ -16,7 +16,15 @@ from mjlab.tasks.tracking.mdp import MotionCommand
 
 
 class _OnnxMotionModel(nn.Module):
-  """ONNX-exportable model that wraps the policy and bundles motion reference data."""
+  """ONNX-exportable model that wraps the policy and bundles motion reference data.
+
+  forward(x, time_step):
+    Inputs:  x (1, obs_dim) observation; time_step (1, 1) frame index.
+    Outputs: (actions, joint_pos, joint_vel, body_pos_w, body_quat_w,
+              body_lin_vel_w, body_ang_vel_w) - the action plus the reference frame
+             at time_step (clamped to the last frame), so a deployment program can read
+             the reference directly from the ONNX file.
+  """
 
   def __init__(self, actor, motion):
     super().__init__()
@@ -45,6 +53,8 @@ class _OnnxMotionModel(nn.Module):
 
 
 class MotionTrackingOnPolicyRunner(MjlabOnPolicyRunner):
+  """PPO runner for tracking tasks; adds two ONNX exports at every checkpoint save."""
+
   env: RslRlVecEnvWrapper
 
   def __init__(
@@ -61,6 +71,11 @@ class MotionTrackingOnPolicyRunner(MjlabOnPolicyRunner):
   def export_motion_policy_to_onnx(
     self, path: str, filename: str = "policy.onnx", verbose: bool = False
   ) -> None:
+    """Export _OnnxMotionModel (policy + embedded reference motion) to path/filename.
+
+    Inputs: path (dir), filename, verbose. Output: None (writes the .onnx file).
+    ONNX inputs: "obs", "time_step"; outputs: "actions", "joint_pos", ..., "body_ang_vel_w".
+    """
     os.makedirs(path, exist_ok=True)
     cmd = cast(MotionCommand, self.env.unwrapped.command_manager.get_term("motion"))
     model = _OnnxMotionModel(self.alg.get_policy(), cmd.motion)
@@ -90,6 +105,15 @@ class MotionTrackingOnPolicyRunner(MjlabOnPolicyRunner):
     )
 
   def save(self, path: str, infos=None):
+    """Save checkpoint + ONNX files.
+
+    Input: path = ".../<run_dir>/model_<iter>.pt". Output: None. Writes into <run_dir>:
+      model_<iter>.pt      torch checkpoint
+      <run_dir_name>.onnx  policy + motion reference (with anchor/body-name metadata)
+      policy.onnx          plain actor (obs -> actions); this one is used by
+                           deploy/robots/g1 State_Mimic (the C++ side reads the motion
+                           from the .npz instead)
+    """
     super().save(path, infos)
     policy_path = path.split("model")[0]
     filename = policy_path.split("/")[-2] + ".onnx"

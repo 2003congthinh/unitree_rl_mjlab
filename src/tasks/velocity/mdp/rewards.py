@@ -1,3 +1,14 @@
+"""Reward terms of the velocity task.
+
+Every function has the signature  f(env, **params) -> torch.Tensor of shape (B,)
+(B = num_envs). The RewardManager computes  total = sum_i weight_i * f_i(env) * step_dt
+each control step. Positive weight = bonus, negative weight = penalty
+(weights are set in velocity_env_cfg.py / robot env_cfgs.py).
+Common inputs: `command_name` = name of the command term ("twist"),
+`asset_cfg` = SceneEntityCfg selecting the robot and some of its bodies/sites/joints,
+`sensor_name` = a ContactSensor defined in the robot's env_cfgs.py.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -29,6 +40,9 @@ def track_linear_velocity(
   """Reward for tracking the commanded base linear velocity.
 
   The commanded z velocity is assumed to be zero.
+
+  Inputs: std (tolerance, m/s), command_name. Output: (B,) in (0, 1].
+  How: err = |cmd_xy - v_xy|^2 + 2 * v_z^2 (base frame);  reward = exp(-err / std^2).
   """
   asset: Entity = env.scene[asset_cfg.name]
   command = env.command_manager.get_command(command_name)
@@ -49,6 +63,9 @@ def track_angular_velocity(
   """Reward heading error for heading-controlled envs, angular velocity for others.
 
   The commanded xy angular velocities are assumed to be zero.
+
+  Inputs: std (rad/s), command_name. Output: (B,) in (0, 1].
+  How: err = (cmd_wz - w_z)^2 + 0.05 * |w_xy|^2;  reward = exp(-err / std^2).
   """
   asset: Entity = env.scene[asset_cfg.name]
   command = env.command_manager.get_command(command_name)
@@ -68,6 +85,9 @@ def body_orientation_l2(
 
   If asset_cfg has body_ids specified, computes the projected gravity
   for that specific body. Otherwise, uses the root link projected gravity.
+
+  Output: (B,) = gx^2 + gy^2 of gravity expressed in the body frame
+  (0 when perfectly upright). Used with a NEGATIVE weight -> penalty for tilting.
   """
   asset: Entity = env.scene[asset_cfg.name]
 
@@ -94,6 +114,9 @@ def self_collision_cost(
   When the sensor provides force history (from ``history_length > 0``),
   counts substeps where any contact force exceeds *force_threshold*.
   Falls back to the instantaneous ``found`` count otherwise.
+
+  Inputs: sensor_name (robot-vs-robot ContactSensor), force_threshold (N).
+  Output: (B,) float = number of physics sub-steps with a self-collision.
   """
   sensor: ContactSensor = env.scene[sensor_name]
   data = sensor.data
@@ -110,7 +133,11 @@ def body_angular_velocity_penalty(
   env: ManagerBasedRlEnv,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
-  """Penalize excessive body angular velocities."""
+  """Penalize excessive body angular velocities.
+
+  Input: asset_cfg.body_names = one body (e.g. torso_link).
+  Output: (B,) = w_x^2 + w_y^2 (roll/pitch rate, world frame). Yaw rate is not penalised.
+  """
   asset: Entity = env.scene[asset_cfg.name]
   ang_vel = asset.data.body_link_ang_vel_w[:, asset_cfg.body_ids, :]
   ang_vel = ang_vel.squeeze(1)
@@ -122,7 +149,11 @@ def angular_momentum_penalty(
   env: ManagerBasedRlEnv,
   sensor_name: str,
 ) -> torch.Tensor:
-  """Penalize whole-body angular momentum to encourage natural arm swing."""
+  """Penalize whole-body angular momentum to encourage natural arm swing.
+
+  Input: sensor_name = builtin "robot/root_angmom" sensor, data (B, 3).
+  Output: (B,) = |L|^2. Also logs the mean |L| to env.extras["log"].
+  """
   angmom_sensor: BuiltinSensor = env.scene[sensor_name]
   angmom = angmom_sensor.data
   angmom_magnitude_sq = torch.sum(torch.square(angmom), dim=-1)
@@ -138,7 +169,15 @@ def feet_air_time(
   command_name: str | None = None,
   command_threshold: float = 0.1,
 ) -> torch.Tensor:
-  """Reward feet air time."""
+  """Reward feet air time.
+
+  Inputs: sensor_name (feet ContactSensor with track_air_time), threshold (s),
+          command_name / command_threshold (only active when the robot should move).
+  Output: (B,) >= 0.
+  How: only when exactly half of the feet touch the ground (single stance), take the
+  shortest current contact/air phase; reward = max(0, threshold - |phase - threshold|).
+  (Not used in the default config; foot_gait is used instead.)
+  """
   sensor: ContactSensor = env.scene[sensor_name]
   sensor_data = sensor.data
   air_time = sensor_data.current_air_time
@@ -167,7 +206,13 @@ def feet_clearance(
   command_threshold: float = 0.1,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
-  """Penalize deviation from target clearance height, weighted by foot velocity."""
+  """Penalize deviation from target clearance height, weighted by foot velocity.
+
+  Inputs: target_height (m), asset_cfg.site_names = foot sites, command gating.
+  Output: (B,) = sum_feet |foot_z - target_height| * |foot_vel_xy|.
+  Moving feet (swing phase) are pushed to lift to target_height; stance feet
+  (velocity ~ 0) contribute nothing. Zero when the command is ~0.
+  """
   asset: Entity = env.scene[asset_cfg.name]
   foot_z = asset.data.site_pos_w[:, asset_cfg.site_ids, 2]  # [B, N]
   foot_vel_xy = asset.data.site_lin_vel_w[:, asset_cfg.site_ids, :2]  # [B, N, 2]
@@ -194,6 +239,20 @@ def feet_gait(
         command_name: str,
         sensor_name: str,
 ) -> torch.Tensor:
+    """Reward following a periodic gait pattern (which foot should be on the ground when).
+
+    Inputs:
+      period:    gait cycle length in seconds (0.6 s by default).
+      offset:    list[float], phase offset per foot, e.g. [0, 0.5] for biped
+                 (left/right alternate), [0, 0.5, 0.5, 0] for quadruped trot.
+      threshold: fraction of the cycle a foot should be in stance (e.g. 0.56).
+      command_threshold, command_name: disable when standing still.
+      sensor_name: feet ContactSensor.
+    Output: (B,) in [0, 1] = fraction of feet whose actual contact matches the
+            expected stance/swing state.
+    How: leg_phase = (t / period + offset) % 1; expected stance if leg_phase < threshold.
+    Matches the `phase` observation, so the policy knows where it is in the cycle.
+    """
     sensor: ContactSensor = env.scene[sensor_name]
     is_contact = sensor.data.current_contact_time > 0
     global_phase = ((env.episode_length_buf * env.step_dt) / period).unsqueeze(1)
@@ -213,7 +272,13 @@ def feet_gait(
 
 
 class feet_swing_height:
-  """Penalize deviation from target swing height, evaluated at landing."""
+  """Penalize deviation from target swing height, evaluated at landing.
+
+  Stateful reward (class): keeps peak_heights (B, num_feet) = highest foot z reached
+  during the current swing. On the step a foot touches down,
+  cost += (peak / target_height - 1)^2, then the peak is reset.
+  Output of __call__: (B,). Also logs Metrics/peak_height_mean. (Not used by default.)
+  """
 
   def __init__(self, cfg: RewardTermCfg, env: ManagerBasedRlEnv):
     self.sensor_name = cfg.params["sensor_name"]
@@ -271,7 +336,11 @@ def feet_slip(
   command_threshold: float = 0.01,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
-  """Penalize foot sliding (xy velocity while in contact)."""
+  """Penalize foot sliding (xy velocity while in contact).
+
+  Inputs: sensor_name (feet contacts), asset_cfg.site_names (foot sites), command gating.
+  Output: (B,) = sum over feet in contact of |foot_vel_xy|^2. Logs mean slip velocity.
+  """
   asset: Entity = env.scene[asset_cfg.name]
   contact_sensor: ContactSensor = env.scene[sensor_name]
   command = env.command_manager.get_command(command_name)
@@ -300,7 +369,11 @@ def soft_landing(
   command_name: str | None = None,
   command_threshold: float = 0.05,
 ) -> torch.Tensor:
-  """Penalize high impact forces at landing to encourage soft footfalls."""
+  """Penalize high impact forces at landing to encourage soft footfalls.
+
+  Inputs: sensor_name (feet contacts with "force" field), command gating.
+  Output: (B,) = sum of |contact force| of feet that touched down THIS step.
+  """
   contact_sensor: ContactSensor = env.scene[sensor_name]
   sensor_data = contact_sensor.data
   assert sensor_data.force is not None
@@ -337,6 +410,10 @@ class variable_posture:
 
   Tune std values per joint based on how much motion that joint needs at each
   speed. Map joint name patterns to std values, e.g. {".*knee.*": 0.35}.
+
+  __init__ input: cfg.params with std_standing / std_walking / std_running dicts
+  {joint-regex: std}, resolved once into per-joint tensors (num_joints,).
+  __call__ output: (B,) in (0, 1].
   """
 
   def __init__(self, cfg: RewardTermCfg, env: ManagerBasedRlEnv):
@@ -413,6 +490,12 @@ def stand_still(
         command_threshold: float = 0.1,
         asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
 ) -> torch.Tensor:
+    """Penalize moving the joints away from the default pose when told to stand still.
+
+    Inputs: command_name, command_threshold, asset_cfg (joints).
+    Output: (B,) = sum_j (q_j - q_default_j)^2, but only for envs whose
+            |cmd_xy| + |cmd_wz| <= command_threshold (otherwise 0).
+    """
     asset: Entity = env.scene[asset_cfg.name]
     diff_angle = asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.default_joint_pos[:, asset_cfg.joint_ids]
     reward = torch.sum(torch.square(diff_angle), dim=1)

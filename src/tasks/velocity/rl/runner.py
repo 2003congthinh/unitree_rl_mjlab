@@ -11,9 +11,22 @@ from mjlab.rl.runner import MjlabOnPolicyRunner
 
 
 class VelocityOnPolicyRunner(MjlabOnPolicyRunner):
+  """PPO runner for velocity tasks. Same as MjlabOnPolicyRunner (rsl_rl OnPolicyRunner:
+  collect rollouts -> PPO update -> log) but also exports an ONNX policy at every save."""
+
   env: RslRlVecEnvWrapper
 
   def save(self, path: str, infos=None):
+    """Save checkpoint + deployable ONNX.
+
+    Inputs: path = ".../<run_dir>/model_<iter>.pt", infos (extra dict stored in the .pt).
+    Output: None. Files written in <run_dir>:
+      model_<iter>.pt  - torch checkpoint (actor, critic, optimizer, iteration)
+      policy.onnx      - actor network only, input "obs" -> output "actions",
+                         with metadata (joint names, default pose, gains, obs terms ...)
+                         attached; this is the file copied to deploy/robots/<robot>/config/...
+    Uploads policy.onnx to W&B when the W&B logger is used.
+    """
     super().save(path, infos)
     policy_path = path.split("model")[0]
     filename = "policy.onnx"

@@ -4,6 +4,11 @@
 #include <cnpy.h>
 
 
+// State_Mimic - plays a trained motion-tracking (dance) policy on the G1.
+// Like State_RLBase, but also owns a MotionLoader_ that steps through the reference .npz
+// in time; the motion_command / motion_anchor_ori_b observations read from it.
+// Config: config["FSM"][name] = { policy_dir, motion_file, time_start, time_end,
+//                                 end_state (default "Velocity"), transitions }.
 class State_Mimic : public FSMState
 {
 public:
@@ -32,6 +37,14 @@ private:
 };
 
 
+// MotionLoader_ - C++ twin of the Python MotionLoader: reads the .npz written by
+// scripts/csv_to_npz.py (assumed 50 fps) and exposes the frame at a given time.
+//   load_data_from_npz(file): keeps root (body 0) position/quaternion(wxyz) and
+//                             joint_pos / joint_vel per frame.
+//   update(time)            : frame = floor(clamp(time) / dt).
+//   reset(robot_data, t)    : jump to time t; store the yaw alignment between the
+//                             reference start heading and the robot's heading.
+//   root_position() / root_quaternion() / joint_pos() / joint_vel(): current frame data.
 class State_Mimic::MotionLoader_
 {
 public:

@@ -33,6 +33,14 @@ def terrain_levels_vel(
   command_name: str,
   asset_cfg: SceneEntityCfg = _DEFAULT_SCENE_CFG,
 ) -> torch.Tensor:
+  """Terrain curriculum: move robots to harder / easier terrain rows at episode reset.
+
+  Inputs: env_ids (K,) envs being reset, command_name.
+  Output: scalar tensor = mean terrain level (logged to TensorBoard/W&B).
+  How: distance = how far the robot walked from its spawn point.
+       - walked more than half a tile      -> level up (harder terrain)
+       - walked < 50% of (|cmd| * episode) -> level down (easier terrain)
+  """
   asset: Entity = env.scene[asset_cfg.name]
 
   terrain = env.scene.terrain
@@ -70,6 +78,15 @@ def commands_vel(
   command_name: str,
   velocity_stages: list[VelocityStage],
 ) -> dict[str, torch.Tensor]:
+  """Command curriculum: widen the velocity ranges as training progresses.
+
+  Inputs: command_name, velocity_stages = list of dicts
+          {"step": int env-steps, "lin_vel_x": (min,max), "lin_vel_y": ..., "ang_vel_z": ...}.
+  Output: {} (empty dict -> nothing logged).
+  How: for every stage whose "step" < env.common_step_counter, overwrite the command
+  config ranges. Default: start at vx in [-0.5, 1], after 5000 iterations * 24 steps
+  expand to vx in [-1, 2], vy in [-1, 1].
+  """
   del env_ids  # Unused.
   command_term = env.command_manager.get_term(command_name)
   assert command_term is not None
@@ -98,7 +115,11 @@ def reward_weight(
   reward_name: str,
   weight_stages: list[RewardWeightStage],
 ) -> torch.Tensor:
-  """Update a reward term's weight based on training step stages."""
+  """Update a reward term's weight based on training step stages.
+
+  Inputs: reward_name, weight_stages = [{"step": int, "weight": float}, ...].
+  Output: (1,) tensor with the current weight. (Not used in the default config.)
+  """
   del env_ids  # Unused.
   reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
   for stage in weight_stages:

@@ -17,7 +17,19 @@ def unitree_g1_flat_tracking_env_cfg(
   has_state_estimation: bool = True,
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
-  """Create Unitree G1 flat terrain tracking configuration."""
+  """Create Unitree G1 flat terrain tracking configuration.
+
+  Inputs:
+    has_state_estimation: False removes "motion_anchor_pos_b" and "base_lin_vel" from the
+                          actor observations (quantities a real robot cannot measure
+                          reliably without a state estimator) -> the
+                          "...-No-State-Estimation" task used for deployment.
+    play: evaluation variant (infinite episode, no noise/pushes, motion always starts
+          at frame 0 with no random initial-state perturbation).
+  Output: ManagerBasedRlEnvCfg.
+  Sets: robot = mjlab's G1 asset, anchor body "torso_link", the 14 tracked bodies,
+  foot friction randomisation geoms, end-effector bodies for the termination check.
+  """
   cfg = make_tracking_env_cfg()
 
   cfg.scene.entities = {"robot": get_g1_robot_cfg()}

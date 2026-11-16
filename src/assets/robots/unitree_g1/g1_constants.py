@@ -1,4 +1,16 @@
-"""Unitree G1 constants."""
+"""Unitree G1 constants.
+
+Describes the physical G1 (29 DoF humanoid) for mjlab:
+  MJCF model (xmls/g1.xml + meshes)  -> get_spec()
+  motor models (armature, gains, torque limits) -> G1_ACTUATOR_* / G1_ARTICULATION
+  start pose -> HOME_KEYFRAME,  collision settings -> FULL_COLLISION ...
+  get_g1_robot_cfg() bundles all of that into an EntityCfg used by the env configs.
+  G1_ACTION_SCALE maps joint-regex -> action scale used by JointPositionAction.
+
+Gain design: each joint is a PD controller tuned as a 2nd-order system with natural
+frequency 10 Hz and damping ratio 2 on the reflected rotor inertia (armature):
+  stiffness = armature * w^2,  damping = 2 * zeta * armature * w.
+"""
 
 from pathlib import Path
 
@@ -25,12 +37,17 @@ assert G1_XML.exists()
 
 
 def get_assets(meshdir: str) -> dict[str, bytes]:
+  """Read all mesh files under xmls/assets.
+
+  Input: meshdir (str) prefix used inside the MJCF. Output: {"<meshdir>/<file>": bytes}.
+  """
   assets: dict[str, bytes] = {}
   update_assets(assets, G1_XML.parent / "assets", meshdir)
   return assets
 
 
 def get_spec() -> mujoco.MjSpec:
+  """Output: mujoco.MjSpec parsed from g1.xml with mesh assets attached in memory."""
   spec = mujoco.MjSpec.from_file(str(G1_XML))
   spec.assets = get_assets(spec.meshdir)
   return spec
@@ -275,6 +292,10 @@ def get_g1_robot_cfg() -> EntityCfg:
 
   Returns a new EntityCfg instance each time to avoid mutation issues when
   the config is shared across multiple places.
+
+  Output: EntityCfg(init_state=HOME_KEYFRAME, collisions=(FULL_COLLISION,),
+                    spec_fn=get_spec, articulation=G1_ARTICULATION).
+  Used by: src/tasks/velocity/config/g1/env_cfgs.py (scene.entities["robot"]).
   """
   return EntityCfg(
     init_state=HOME_KEYFRAME,
@@ -284,6 +305,10 @@ def get_g1_robot_cfg() -> EntityCfg:
   )
 
 
+# Action scale per joint group: 0.25 * effort_limit / stiffness.
+# Meaning: an action of 1.0 moves the target angle by the offset that would make the PD
+# controller produce 25 % of the motor's max torque -> weak motors get small scales.
+# Structure: {joint_regex: float}, e.g. {".*_knee_joint": 0.35, ...}.
 G1_ACTION_SCALE: dict[str, float] = {}
 for a in G1_ARTICULATION.actuators:
   assert isinstance(a, BuiltinPositionActuatorCfg)

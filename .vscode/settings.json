@@ -1,0 +1,5 @@
+{
+    "cmake.sourceDirectory": "C:/Users/ADMIN/Desktop/code_folders/VinUni-AI20K/VinRobotics/unitree_rl_mjlab/simulate",
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda"
+}

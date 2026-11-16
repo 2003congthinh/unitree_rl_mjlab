@@ -18,6 +18,10 @@ public:
         data.joystick = &lowstate->joystick;
     }
 
+    // update(): copy the latest LowState DDS message into `data` (thread-safe):
+    //   IMU gyroscope -> root_ang_vel_b, IMU quaternion -> root_quat_w ->
+    //   projected_gravity_b = conj(q) * (0,0,-1), motor q/dq -> joint_pos/vel
+    //   (re-ordered with joint_ids_map). Called once per policy step.
     void update() override
     {
         std::lock_guard<std::mutex> lock(lowstate->mutex_);

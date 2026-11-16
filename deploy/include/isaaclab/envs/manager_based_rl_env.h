@@ -18,10 +18,20 @@ namespace isaaclab
 class ObservationManager;
 class ActionManager;
 
+// ManagerBasedRLEnv - minimal C++ mirror of the Python mjlab environment, used on the robot.
+// It has no physics: the "world" is the real robot (or the MuJoCo bridge).
+//   cfg      : parsed deploy.yaml (step_dt, joint_ids_map, stiffness, damping,
+//              default_joint_pos, commands, actions, observations)
+//   robot    : Articulation whose data is refreshed from LowState
+//   observation_manager / action_manager : built from cfg["observations"] / cfg["actions"]
+//   alg      : policy runner (OrtRunner = ONNX Runtime)
 class ManagerBasedRLEnv
 {
 public:
     // Constructor
+    // Inputs: cfg = deploy.yaml node; robot_ = articulation (unitree::BaseArticulation).
+    // Output: none. Copies joint map / default pose / gains into robot->data and creates
+    //         the action and observation managers.
     ManagerBasedRLEnv(YAML::Node cfg, std::shared_ptr<Articulation> robot_)
     :cfg(cfg), robot(std::move(robot_))
     {
@@ -47,6 +57,8 @@ public:
         observation_manager = std::make_unique<ObservationManager>(cfg["observations"], this);
     }
 
+    // reset(): zero the gait phase and episode counter, refresh sensors, clear last action
+    // and fill observation history buffers with the current observation.
     void reset()
     {
         global_phase = 0;
@@ -56,6 +68,9 @@ public:
         observation_manager->reset();
     }
 
+    // step(): ONE POLICY STEP = robot->update() (read sensors) -> observation_manager->compute()
+    // ({group_name: vector<float>}) -> alg->act(obs) (ONNX) -> action_manager->process_action()
+    // (raw action * scale + offset = target joint angles). Called at 1/step_dt Hz.
     void step()
     {
         episode_length += 1;

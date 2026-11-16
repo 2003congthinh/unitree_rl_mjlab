@@ -8,7 +8,17 @@ from mjlab.rl import (
 
 
 def unitree_g1_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
-  """Create RL runner configuration for Unitree G1 velocity task."""
+  """Create RL runner configuration for Unitree G1 velocity task.
+
+  Input: none. Output: RslRlOnPolicyRunnerCfg with
+    actor / critic : MLP 512-256-128, ELU, observation normalisation;
+                     actor outputs a Gaussian (mean = action, learnable scalar std).
+    algorithm      : PPO (clip 0.2, gamma 0.99, GAE lambda 0.95, 5 epochs x 4 mini-batches,
+                     adaptive LR targeting KL 0.01, entropy bonus 0.01).
+    num_steps_per_env=24 -> each iteration collects 24 steps x num_envs transitions.
+    experiment_name="g1_velocity" -> logs/rsl_rl/g1_velocity/...
+    save_interval=100, max_iterations=10001.
+  """
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(
       hidden_dims=(512, 256, 128),

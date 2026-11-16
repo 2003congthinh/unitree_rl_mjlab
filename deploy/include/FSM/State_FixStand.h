@@ -6,6 +6,10 @@
 #include "FSMState.h"
 #include "LinearInterpolator.h"
 
+// State_FixStand - slowly moves every joint from its current angle to a standing pose.
+// Config: config["FSM"]["FixStand"] = { kp: [..], kd: [..],
+//   ts: [t0, t1, ...] key-frame times (s), qs: [[q at t0], [q at t1], ...] joint targets }.
+// qs[0] is replaced on enter() by the current joint targets.
 class State_FixStand : public FSMState
 {
 public:
@@ -17,6 +21,7 @@ public:
         assert(ts_.size() == qs_.size());
     }
 
+    // enter(): set PD gains, record the start pose as qs_[0] and the start time t0_.
     void enter()
     {
         // set gain
@@ -40,9 +45,10 @@ public:
         t0_ = (double)unitree::common::GetCurrentTimeMillisecond() * 1e-3;
     }
 
+    // run(): q_target(t) = piecewise-linear interpolation of the key-frames (LinearInterpolator.h).
     void run()
     {
-        float t = (double)unitree::common::GetCurrentTimeMillisecond() * 1e-3 - t0_;
+        float t =(double)unitree::common::GetCurrentTimeMillisecond() * 1e-3 - t0_;
         auto q = linear_interpolate(t, ts_, qs_);
         
         for(int i(0); i < q.size(); ++i) {

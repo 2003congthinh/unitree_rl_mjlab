@@ -15,6 +15,12 @@ class ManagerBasedRLEnv;
 
 using ObsFunc = std::function<std::vector<float>(ManagerBasedRLEnv*, YAML::Node)>;
 
+// ObservationTermCfg - one observation term + its history ring buffer.
+//   params, func         : arguments and registered function
+//   scale (per element), clip ([min, max]), scale_first (order of the two)
+//   history_length       : how many past values are kept and concatenated
+//   reset(obs) fills the buffer with obs; add(obs) clips/scales and pushes it;
+//   get() returns all history entries concatenated (oldest first).
 struct ObservationTermCfg
 {
     YAML::Node params;

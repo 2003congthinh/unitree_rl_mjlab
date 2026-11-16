@@ -10,6 +10,15 @@ namespace isaaclab
 namespace mdp
 {
 
+// Built-in observation terms. Each: (env, params YAML) -> std::vector<float>.
+// They mirror the Python training terms so the policy sees the same numbers:
+//   base_ang_vel      (3)  IMU gyroscope                         <- builtin_sensor imu_ang_vel
+//   projected_gravity (3)  gravity in base frame                 <- projected_gravity
+//   joint_pos / joint_pos_rel (J)  q  /  q - q_default           <- joint_pos_rel
+//   joint_vel_rel     (J)  dq                                    <- joint_vel_rel
+//   last_action       (A)  previous raw policy output            <- last_action
+//   velocity_commands (3)  joystick (ly, -lx, -rx) clamped to the command ranges <- "command"
+//   gait_phase        (2)  [sin, cos] of the gait clock, 0 when |cmd| < 0.1      <- phase
 REGISTER_OBSERVATION(base_ang_vel)
 {
     auto & asset = env->robot;

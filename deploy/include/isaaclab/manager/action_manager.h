@@ -10,7 +10,8 @@
 namespace isaaclab
 {
 
-class ActionTerm 
+// ActionTerm - converts a slice of the raw policy output into robot commands.
+class ActionTerm
 {
 public:
     ActionTerm(YAML::Node cfg, ManagerBasedRLEnv* env): cfg(cfg), env(env) {}
@@ -40,6 +41,11 @@ inline std::map<std::string, std::function<std::unique_ptr<ActionTerm>(YAML::Nod
         } \
     } name##_registrar_instance;
 
+// ActionManager - cfg = deploy.yaml["actions"] = { TermClassName: {scale, offset, clip, joint_ids} }.
+//   process_action(a): stores the raw action (fed back as `last_action` observation) and
+//                      splits it among the terms.
+//   processed_actions(): concatenation of every term's processed output
+//                        (= target joint angles for JointPositionAction).
 class ActionManager
 {
 public:

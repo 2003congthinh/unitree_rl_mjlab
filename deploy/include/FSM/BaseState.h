@@ -8,8 +8,15 @@
 #include <any>
 #include <utility>
 
+// Global two-way map  state id (int) <-> state name (string), e.g. 1 <-> "Passive".
 inline boost::bimap<int, std::string> FSMStringMap;
 
+// BaseState - abstract life-cycle of one controller state:
+//   enter()    called once when the FSM switches INTO this state
+//   pre_run()  / run() / post_run()  called every 1 ms while active
+//   exit()     called once when leaving
+// registered_checks: list of (condition(), target_state_id); CtrlFSM::run_ polls them
+// to decide transitions.
 class BaseState
 {
 public:
@@ -34,6 +41,9 @@ private:
     int state_;
 };
 
+// Factory registry: "State_Xxx" -> function(id, name) creating that state.
+// REGISTER_FSM(State_Xxx) (placed after each state class) adds an entry at program
+// start-up through a static registrar object, so CtrlFSM can build states by name.
 using FsmFactory = std::function<std::shared_ptr<BaseState>(int, std::string)>;
 using FsmMap     = std::unordered_map<std::string, FsmFactory>;
 

@@ -22,7 +22,17 @@ TerrainType = Literal["rough", "obstacles"]
 def unitree_go2_rough_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
-  """Create Unitree Go2 rough terrain velocity configuration."""
+  """Create Unitree Go2 rough terrain velocity configuration.
+
+  Input:  play (bool). Output: ManagerBasedRlEnvCfg.
+  Quadruped differences vs. the humanoid template:
+    - 4 feet (FR, FL, RR, RL) -> feet_gait offsets [0, 0.5, 0.5, 0] = trot
+      (diagonal legs move together).
+    - "nonfoot_ground_touch" ContactSensor + extra termination "illegal_contact":
+      the episode ends if the body/thighs touch the ground.
+    - default action scale 0.25 (no per-joint scale), base body "base_link".
+  A2 / As2 configs are identical except for the robot asset.
+  """
   cfg = make_velocity_env_cfg()
 
   cfg.sim.mujoco.ccd_iterations = 500
@@ -137,7 +147,10 @@ def unitree_go2_rough_env_cfg(
 
 
 def unitree_go2_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Create Unitree Go2 flat terrain velocity configuration."""
+  """Create Unitree Go2 flat terrain velocity configuration.
+
+  Input: play (bool). Output: ManagerBasedRlEnvCfg (rough cfg -> plane, no height scan).
+  """
   cfg = unitree_go2_rough_env_cfg(play=play)
 
   cfg.sim.njmax = 300

@@ -36,6 +36,11 @@ public:
         }
     }
 
+    // process_actions(raw)
+    //   Input : raw policy output (action_dim).
+    //   Output: none; _processed_actions[i] = clip(raw[i] * scale[i] + offset[i]).
+    //   With offset = default joint pos and scale = training action scale, this reproduces
+    //   mjlab's JointPositionAction(use_default_offset=True).
     virtual void process_actions(std::vector<float> actions)
     {
         // TODO: modify action by joint_ids

@@ -7,6 +7,9 @@ static Eigen::Quaternionf init_quat;
 std::shared_ptr<State_Mimic::MotionLoader_> State_Mimic::motion = nullptr;
 
 
+// robot_quat_w(env)
+//   Output: world orientation of the robot's torso (the training "anchor" body), computed
+//           as pelvis IMU quaternion * waist yaw(12) * waist roll(13) * waist pitch(14).
 Eigen::Quaternionf robot_quat_w(isaaclab::ManagerBasedRLEnv* env)
 {
     using G1Type = unitree::BaseArticulation<LowState_t::SharedPtr>;
@@ -24,6 +27,9 @@ Eigen::Quaternionf robot_quat_w(isaaclab::ManagerBasedRLEnv* env)
     return torso_quat;
 }
 
+// motion_anchor_quat_w(loader)
+//   Output: reference torso orientation at the current frame (same composition as above,
+//           using the reference root quaternion and reference waist angles).
 Eigen::Quaternionf motion_anchor_quat_w(std::shared_ptr<State_Mimic::MotionLoader_> loader)
 {
     const auto root_quat = loader->root_quaternion();
@@ -43,6 +49,8 @@ namespace isaaclab
 namespace mdp
 {
 
+// Observation "motion_command": [ref joint_pos (29), ref joint_vel (29)] at the current
+// frame - equals MotionCommand.command in training.
 REGISTER_OBSERVATION(motion_command)
 {
     auto loader = State_Mimic::motion;
@@ -60,6 +68,9 @@ REGISTER_OBSERVATION(motion_command)
     return data;
 }
 
+// Observation "motion_anchor_ori_b": 6 numbers = first two columns of the rotation
+// between the (yaw-aligned via init_quat) reference torso and the real torso - equals the
+// Python motion_anchor_ori_b term.
 REGISTER_OBSERVATION(motion_anchor_ori_b)
 {
     auto loader = State_Mimic::motion;
@@ -80,8 +91,11 @@ REGISTER_OBSERVATION(motion_anchor_ori_b)
 }
 
 
+// Constructor: loads the motion .npz, the time window [time_start, time_end], the env
+// (deploy.yaml) and the ONNX policy; registers checks: time window finished -> end_state,
+// bad orientation -> Passive.
 State_Mimic::State_Mimic(int state_mode, std::string state_string)
-: FSMState(state_mode, state_string) 
+: FSMState(state_mode, state_string)
 {
     auto cfg = param::config["FSM"][state_string];
     auto policy_dir = param::parser_policy_dir(cfg["policy_dir"].as<std::string>());
@@ -135,6 +149,9 @@ State_Mimic::State_Mimic(int state_mode, std::string state_string)
     );
 }
 
+// enter(): set gains, then start a 50 Hz policy thread that (1) aligns the reference
+// heading to the robot's current heading (init_quat), (2) each tick advances the motion
+// to t = episode_length * step_dt + time_start and calls env->step().
 void State_Mimic::enter()
 {
     // set gain
@@ -179,6 +196,7 @@ void State_Mimic::enter()
 }
 
 
+// run() (1 kHz): write the latest target joint angles to lowcmd (same as State_RLBase).
 void State_Mimic::run()
 {
     auto action = env->action_manager->processed_actions();

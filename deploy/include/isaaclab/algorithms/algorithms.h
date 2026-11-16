@@ -10,6 +10,7 @@
 namespace isaaclab
 {
 
+// Algorithms - interface of a policy: act(obs_map) -> action vector.
 class Algorithms
 {
 public:
@@ -26,9 +27,12 @@ protected:
     std::mutex act_mtx_;
 };
 
+// OrtRunner - runs policy.onnx with ONNX Runtime on the CPU.
 class OrtRunner : public Algorithms
 {
 public:
+    // Input: model_path to policy.onnx. Reads the model's input names/shapes (e.g. "obs",
+    // [1, obs_dim]) and the first output's shape ([1, action_dim]).
     OrtRunner(std::string model_path)
     {
         // Init Model
@@ -61,6 +65,10 @@ public:
         action.resize(output_shape[1]);
     }
 
+    // act(obs)
+    //   Input : obs = {input_name: flat float vector}; every ONNX input name must be a key
+    //           (with a single observation group the key is "obs").
+    //   Output: action vector (action_dim) = first ONNX output; also stored in `action`.
     std::vector<float> act(std::unordered_map<std::string, std::vector<float>> obs)
     {
         auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);

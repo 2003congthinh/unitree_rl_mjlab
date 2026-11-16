@@ -30,6 +30,16 @@ _DESIRED_FRAME_COLORS = ((1.0, 0.5, 0.5), (0.5, 1.0, 0.5), (0.5, 0.5, 1.0))
 
 
 class MotionLoader:
+  """Loads the .npz reference motion into GPU tensors.
+
+  Inputs: motion_file (.npz written by scripts/csv_to_npz.py), body_indexes (K,) = robot
+          body ids to keep, device.
+  Attributes (T = frames, J = joints, K = tracked bodies):
+    joint_pos (T, J), joint_vel (T, J),
+    body_pos_w (T, K, 3), body_quat_w (T, K, 4), body_lin_vel_w (T, K, 3),
+    body_ang_vel_w (T, K, 3), time_step_total = T.
+  """
+
   def __init__(
     self, motion_file: str, body_indexes: torch.Tensor, device: str = "cpu"
   ) -> None:
@@ -57,10 +67,29 @@ class MotionLoader:
 
 
 class MotionCommand(CommandTerm):
+  """The "motion" command: a per-env playhead into the reference clip.
+
+  NOTE: tracking_env_cfg.py imports MotionCommandCfg from mjlab.tasks.tracking.mdp, so at
+  runtime mjlab's identical class is instantiated; the observations/rewards here only
+  `cast` to this type (same attribute names), so both work.
+
+  Main state (B = num_envs, K = tracked bodies):
+    time_steps            (B,) current frame index of each env in the clip
+    body_pos_relative_w   (B, K, 3) reference body positions re-expressed around the
+                          ROBOT's current anchor (xy + yaw follow the robot, z from ref)
+    body_quat_relative_w  (B, K, 4) same for orientations
+    bin_failed_count      (num_bins,) smoothed failure rate per 1-second bin of the clip
+                          -> used for adaptive sampling of start frames.
+  Properties named `xxx` are the reference at time_steps, `robot_xxx` are the robot's
+  actual values; rewards compare the two.
+  """
+
   cfg: MotionCommandCfg
   _env: ManagerBasedRlEnv
 
   def __init__(self, cfg: MotionCommandCfg, env: ManagerBasedRlEnv):
+    """Inputs: cfg (motion_file, anchor_body_name, body_names, ranges, sampling mode), env.
+    Output: None. Loads the motion, allocates playheads, sampling bins and metrics."""
     super().__init__(cfg, env)
 
     self.robot: Entity = env.scene[cfg.entity_name]
@@ -121,6 +150,8 @@ class MotionCommand(CommandTerm):
 
   @property
   def command(self) -> torch.Tensor:
+    """Output: (B, 2J) = [reference joint_pos, reference joint_vel] at the current frame.
+    This is the "command" observation fed to the policy."""
     return torch.cat([self.joint_pos, self.joint_vel], dim=1)
 
   @property
@@ -209,6 +240,8 @@ class MotionCommand(CommandTerm):
     return self.robot.data.body_link_ang_vel_w[:, self.robot_anchor_body_index]
 
   def _update_metrics(self):
+    """Compute per-env tracking errors (anchor pos/rot/vel, body pos/rot/vel, joint
+    pos/vel) into self.metrics[...] (each (B,)) for logging. Output: None."""
     self.metrics["error_anchor_pos"] = torch.norm(
       self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1
     )
@@ -244,6 +277,14 @@ class MotionCommand(CommandTerm):
     )
 
   def _adaptive_sampling(self, env_ids: torch.Tensor):
+    """Choose new start frames, favouring parts of the clip where robots often fail.
+
+    Input: env_ids (K,) envs being reset. Output: None (sets self.time_steps[env_ids]).
+    How: the clip is split into bins (~1 s each). Bins where the just-terminated envs
+    failed are counted; probability = smoothed failure count + a uniform floor,
+    convolved with a decaying kernel; bins are drawn with torch.multinomial and a random
+    offset inside the bin is added. Logs sampling entropy / top-1 bin.
+    """
     episode_failed = self._env.termination_manager.terminated[env_ids]
     if torch.any(episode_failed):
       current_bin_index = torch.clamp(
@@ -287,6 +328,7 @@ class MotionCommand(CommandTerm):
     self.metrics["sampling_top1_bin"][:] = imax.float() / self.bin_count
 
   def _uniform_sampling(self, env_ids: torch.Tensor):
+    """Start frames ~ Uniform{0..T-1}. Input: env_ids. Output: None."""
     self.time_steps[env_ids] = torch.randint(
       0, self.motion.time_step_total, (len(env_ids),), device=self.device
     )
@@ -295,6 +337,14 @@ class MotionCommand(CommandTerm):
     self.metrics["sampling_top1_bin"][:] = 0.5  # No specific bin preference.
 
   def _resample_command(self, env_ids: torch.Tensor):
+    """Reference State Initialisation (RSI): teleport the robot onto the reference.
+
+    Input: env_ids (K,) envs being (re)started. Output: None.
+    How: pick a start frame (start / uniform / adaptive), take the reference root pose,
+    velocity and joint state at that frame, add small random noise (pose_range,
+    velocity_range, joint_position_range), clip joints to soft limits and write the
+    state into the simulator.
+    """
     if self.cfg.sampling_mode == "start":
       self.time_steps[env_ids] = 0
     elif self.cfg.sampling_mode == "uniform":
@@ -363,6 +413,15 @@ class MotionCommand(CommandTerm):
     self.robot.clear_state(env_ids=env_ids)
 
   def _update_command(self):
+    """Advance every playhead by one frame and recompute the relative reference.
+
+    Output: None. Envs reaching the clip end are resampled. Then the reference bodies are
+    rigidly moved so that the reference anchor's xy position and yaw coincide with the
+    robot's anchor (height and roll/pitch stay from the reference) ->
+    body_pos_relative_w / body_quat_relative_w. This makes body tracking rewards
+    independent of global drift. Finally the adaptive-sampling failure statistics are
+    updated with an exponential moving average (adaptive_alpha).
+    """
     self.time_steps += 1
     env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
     if env_ids.numel() > 0:
@@ -400,7 +459,12 @@ class MotionCommand(CommandTerm):
       self._current_bin_failed.zero_()
 
   def _debug_vis_impl(self, visualizer: DebugVisualizer) -> None:
-    """Draw ghost robot or frames based on visualization mode."""
+    """Draw ghost robot or frames based on visualization mode.
+
+    "ghost": a semi-transparent green copy of the robot posed at the reference frame
+    (the ghost you see in play.py). "frames": coordinate axes for desired vs. current
+    bodies and anchor.
+    """
     env_indices = visualizer.get_env_indices(self.num_envs)
     if not env_indices:
       return
@@ -472,6 +536,18 @@ class MotionCommand(CommandTerm):
 
 @dataclass(kw_only=True)
 class MotionCommandCfg(CommandTermCfg):
+  """Config of MotionCommand.
+
+  motion_file:      .npz reference (set by --motion-file in train.py / play.py).
+  anchor_body_name: body used as the reference frame (G1: "torso_link").
+  body_names:       tuple of bodies whose pose is tracked.
+  pose_range / velocity_range: {"x","y","z","roll","pitch","yaw": (min,max)} noise added
+                    to the root at reset (RSI); joint_position_range: joint noise.
+  adaptive_*:       kernel size, decay lambda, uniform floor, EMA alpha for adaptive sampling.
+  sampling_mode:    "adaptive" (train), "uniform" (demo), "start" (play).
+  viz:              VizCfg(mode="ghost"|"frames", ghost_color).
+  """
+
   motion_file: str
   anchor_body_name: str
   body_names: tuple[str, ...]

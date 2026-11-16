@@ -40,7 +40,26 @@ VELOCITY_RANGE = {
 
 
 def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
-  """Create base tracking task configuration."""
+  """Create base tracking task configuration.
+
+  Input:  none.
+  Output: ManagerBasedRlEnvCfg template (robot, body names, anchor, motion file are
+          filled by src/tasks/tracking/config/<robot>/env_cfgs.py and train.py).
+
+  Idea (BeyondMimic): a reference motion (.npz from csv_to_npz.py) plays in time;
+  the "motion" command exposes the reference frame at the current time step and the
+  policy is rewarded for matching it.
+    observations["actor"]  : reference joint pos/vel, reference anchor pose relative to
+                             the robot, IMU, joint states, last action
+    observations["critic"] : the same + every tracked body's pose relative to the anchor
+    rewards                : exp(-error/std^2) for anchor position/orientation, body
+                             positions/orientations, body linear/angular velocities;
+                             penalties for action rate, joint limits, self-collisions
+    terminations           : anchor height / orientation or end-effector height drift
+                             too far from the reference -> reset (to a hard part of the
+                             clip, thanks to adaptive sampling)
+  Timing: 200 Hz physics, decimation 4 -> 50 Hz policy, 10 s episodes.
+  """
 
   ##
   # Observations

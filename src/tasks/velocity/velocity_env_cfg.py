@@ -34,7 +34,26 @@ import src.tasks.velocity.mdp as mdp
 
 
 def make_velocity_env_cfg() -> ManagerBasedRlEnvCfg:
-  """Create base velocity tracking task configuration."""
+  """Create base velocity tracking task configuration.
+
+  Input:  none.
+  Output: ManagerBasedRlEnvCfg - a robot-agnostic template. Fields marked "Set per-robot"
+          (body/site/geom names, action scale, pose std ...) are filled later by
+          src/tasks/velocity/config/<robot>/env_cfgs.py.
+
+  The returned config is a set of dicts {term_name: TermCfg(func=..., params=...)};
+  mjlab's managers call each `func(env, **params)` every control step:
+    observations["actor"]  -> policy input (noisy, what the real robot can measure)
+    observations["critic"] -> value-function input (actor terms + privileged info)
+    actions["joint_pos"]   -> target joint angle = default + scale * action
+    commands["twist"]      -> random (vx, vy, wz) target, resampled every 3-8 s
+    events                 -> resets, random pushes, domain randomisation
+    rewards                -> weighted sum = training signal
+    terminations           -> time-out, falling over
+    curriculum             -> terrain level + command-range stages
+  Timing: physics dt = 0.005 s, decimation = 4  => policy runs at 50 Hz (step_dt = 0.02 s),
+  episode = 20 s.
+  """
 
   ##
   # Sensors

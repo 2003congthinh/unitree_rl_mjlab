@@ -1,3 +1,5 @@
+# Public robot API: one get_<robot>_robot_cfg() -> EntityCfg per robot (+ an
+# <ROBOT>_ACTION_SCALE dict for humanoids). Imported by src/tasks/*/config/<robot>/env_cfgs.py.
 from .unitree_go2.go2_constants import (
   get_go2_robot_cfg as get_go2_robot_cfg,
 )

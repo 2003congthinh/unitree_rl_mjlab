@@ -1,3 +1,11 @@
+"""Reward terms of the tracking (motion imitation) task.
+
+All `*_error_exp` terms return (B,) values in (0, 1]:  exp(-error / std^2), where error
+compares the reference (MotionCommand.xxx) with the robot (MotionCommand.robot_xxx).
+1.0 = perfect imitation. `std` sets how forgiving the term is. Optional `body_names`
+restricts a term to a subset of tracked bodies (None = all).
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
@@ -16,6 +24,7 @@ if TYPE_CHECKING:
 def _get_body_indexes(
   command: MotionCommand, body_names: tuple[str, ...] | None
 ) -> list[int]:
+  """Map body names -> indices into command.cfg.body_names (None = all). Output: list[int]."""
   return [
     i
     for i, name in enumerate(command.cfg.body_names)
@@ -26,6 +35,7 @@ def _get_body_indexes(
 def motion_global_anchor_position_error_exp(
   env: ManagerBasedRlEnv, command_name: str, std: float
 ) -> torch.Tensor:
+  """Global anchor (torso) position tracking. error = |p_ref - p_robot|^2 (world)."""
   command = cast(MotionCommand, env.command_manager.get_term(command_name))
   error = torch.sum(
     torch.square(command.anchor_pos_w - command.robot_anchor_pos_w), dim=-1
@@ -36,6 +46,7 @@ def motion_global_anchor_position_error_exp(
 def motion_global_anchor_orientation_error_exp(
   env: ManagerBasedRlEnv, command_name: str, std: float
 ) -> torch.Tensor:
+  """Global anchor orientation tracking. error = (rotation angle between quats)^2."""
   command = cast(MotionCommand, env.command_manager.get_term(command_name))
   error = quat_error_magnitude(command.anchor_quat_w, command.robot_anchor_quat_w) ** 2
   return torch.exp(-error / std**2)
@@ -47,6 +58,8 @@ def motion_relative_body_position_error_exp(
   std: float,
   body_names: tuple[str, ...] | None = None,
 ) -> torch.Tensor:
+  """Body position tracking relative to the anchor (drift-free).
+  error = mean_k |p_ref_rel_k - p_robot_k|^2 using body_pos_relative_w."""
   command = cast(MotionCommand, env.command_manager.get_term(command_name))
   body_indexes = _get_body_indexes(command, body_names)
   error = torch.sum(
@@ -65,6 +78,7 @@ def motion_relative_body_orientation_error_exp(
   std: float,
   body_names: tuple[str, ...] | None = None,
 ) -> torch.Tensor:
+  """Body orientation tracking relative to the anchor. error = mean_k angle_k^2."""
   command = cast(MotionCommand, env.command_manager.get_term(command_name))
   body_indexes = _get_body_indexes(command, body_names)
   error = (
@@ -83,6 +97,7 @@ def motion_global_body_linear_velocity_error_exp(
   std: float,
   body_names: tuple[str, ...] | None = None,
 ) -> torch.Tensor:
+  """Body linear velocity tracking (world). error = mean_k |v_ref_k - v_robot_k|^2."""
   command = cast(MotionCommand, env.command_manager.get_term(command_name))
   body_indexes = _get_body_indexes(command, body_names)
   error = torch.sum(
@@ -101,6 +116,7 @@ def motion_global_body_angular_velocity_error_exp(
   std: float,
   body_names: tuple[str, ...] | None = None,
 ) -> torch.Tensor:
+  """Body angular velocity tracking (world). error = mean_k |w_ref_k - w_robot_k|^2."""
   command = cast(MotionCommand, env.command_manager.get_term(command_name))
   body_indexes = _get_body_indexes(command, body_names)
   error = torch.sum(
@@ -123,6 +139,8 @@ def self_collision_cost(
   When the sensor provides force history (from ``history_length > 0``),
   counts substeps where any contact force exceeds *force_threshold*.
   Falls back to the instantaneous ``found`` count otherwise.
+
+  Output: (B,) number of sub-steps with self-contact (used with weight -10).
   """
   sensor: ContactSensor = env.scene[sensor_name]
   data = sensor.data

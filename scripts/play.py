@@ -1,4 +1,17 @@
-"""Script to play RL agent with RSL-RL."""
+"""Script to play RL agent with RSL-RL.
+
+ENTRY POINT of the "Play" (simulation validation) step.
+
+  python scripts/play.py <TASK_ID> --checkpoint-file=logs/rsl_rl/.../model_XXXX.pt
+                                   [--motion-file=...npz] [--num-envs N] [--viewer native|viser]
+
+Call graph:
+  main() -> run_play(task_id, PlayConfig)
+    -> load_env_cfg(task_id, play=True)   (the robot's env_cfg with play=True overrides)
+    -> ManagerBasedRlEnv -> [VideoRecorder] -> RslRlVecEnvWrapper
+    -> policy = runner.get_inference_policy()   (or a zero / random dummy policy)
+    -> NativeMujocoViewer(env, policy).run()  or  ViserPlayViewer(env, policy).run()
+"""
 
 import os
 import sys
@@ -21,7 +34,21 @@ from mjlab.viewer import NativeMujocoViewer, ViserPlayViewer
 
 @dataclass(frozen=True)
 class PlayConfig:
-  agent: Literal["zero", "random", "trained"] = "trained"
+  """CLI options of play.py.
+
+  Fields:
+    agent:           "trained" (load checkpoint) | "zero" (all-zero actions) | "random".
+    checkpoint_file: path to model_<iter>.pt produced by train.py.
+    motion_file:     .npz reference motion (tracking tasks only).
+    num_envs:        number of robots to show (overrides env_cfg.scene.num_envs).
+    device:          "cuda:0" / "cpu" (auto if None).
+    video*, camera:  optional offline video recording settings.
+    viewer:          "native" MuJoCo window, "viser" web viewer, or "auto"
+                     (native if a DISPLAY exists, else viser).
+    no_terminations: remove all termination terms (robot is never reset).
+  """
+
+  agent:Literal["zero", "random", "trained"] = "trained"
   checkpoint_file: str | None = None
   motion_file: str | None = None
   num_envs: int | None = None
@@ -40,6 +67,26 @@ class PlayConfig:
 
 
 def run_play(task_id: str, cfg: PlayConfig):
+  """Run a trained (or dummy) policy in an interactive viewer.
+
+  Inputs:
+    task_id: registered task name (e.g. "Unitree-G1-Flat").
+    cfg:     PlayConfig.
+  Output:
+    None (blocks until the viewer window is closed).
+
+  How it works:
+    1. Loads the *play* env config (infinite episodes, no pushes, no obs noise).
+    2. For tracking tasks, plugs in --motion-file.
+    3. In "trained" mode, resolves the checkpoint path and builds the task runner,
+       loads only the actor weights and gets `policy(obs) -> actions`.
+       In "zero"/"random" mode, builds a tiny callable class returning zeros / U(-1,1).
+    4. Hands env + policy to the viewer, which loops: obs -> policy -> env.step(actions).
+
+  NOTE: the fallback branches reference `cfg.registry_name` and `cfg.wandb_run_path`,
+  which are NOT fields of PlayConfig. Always pass --checkpoint-file (and --motion-file
+  for tracking tasks), otherwise these branches raise AttributeError.
+  """
   configure_torch_backends()
 
   device = cfg.device or ("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -178,6 +225,7 @@ def run_play(task_id: str, cfg: PlayConfig):
 
 
 def main():
+  """CLI entry point: parse "<TASK_ID> [PlayConfig flags]" and call run_play()."""
   # Parse first argument to choose the task.
   # Import tasks to populate the registry.
   import mjlab.tasks  # noqa: F401

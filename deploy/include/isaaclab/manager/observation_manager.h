@@ -12,6 +12,9 @@
 namespace isaaclab
 {
 
+// Registry of observation functions: name -> ObsFunc(env, params) -> vector<float>.
+// REGISTER_OBSERVATION(name) { ...body... } defines the function AND registers it under
+// "name" at start-up; deploy.yaml refers to observations by these names.
 using ObsMap = std::map<std::string, ObsFunc>;
 
 inline ObsMap& observations_map() {
@@ -27,6 +30,11 @@ inline ObsMap& observations_map() {
     inline std::vector<float> name(ManagerBasedRLEnv* env, YAML::Node params)
 
 
+// ObservationManager - builds the policy input vector exactly like training.
+// cfg = deploy.yaml["observations"], either
+//   single group : { term_name: {params, scale, clip, history_length}, ... }  -> group "obs"
+//   multi groups : { group_name: { term_name: {...}, ... }, ... }
+// The ORDER of terms in deploy.yaml must match the training observation order.
 class ObservationManager
 {
 public:
@@ -47,6 +55,7 @@ public:
         }
     }
 
+    // compute(): Output = {group_name: concatenated observation vector} (input to OrtRunner::act).
     std::unordered_map<std::string, std::vector<float>> compute()
     {
         std::unordered_map<std::string, std::vector<float>> obs_map;
@@ -60,6 +69,9 @@ public:
 
 
 
+    // compute_group(name): evaluate every term, push it (clipped + scaled) into its history
+    // buffer, then concatenate. Default layout: [term1 h0..hN, term2 h0..hN, ...];
+    // with use_gym_history: [h0: term1, term2, ...][h1: ...] (time-major).
     const std::vector<float> compute_group(const std::string& group_name)
     {
         std::vector<float> obs;

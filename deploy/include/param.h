@@ -57,6 +57,8 @@ inline std::filesystem::path get_bin_path() {
 }
 
 /* ---------- config.yaml ---------- */
+// load_config_file(): proj_dir = folder above build/ (or bin/); loads
+// <proj_dir>/config/config.yaml into the global param::config (FSM states, gains, paths).
 inline void load_config_file()
 {
     assert(std::filesystem::exists(bin_path)); // run param::helper before this function
@@ -83,6 +85,10 @@ inline void load_config_file()
     }
 }
 
+// parser_policy_dir(dir)
+//   Input : policy dir from config.yaml (relative to proj_dir), e.g. config/policy/velocity.
+//   Output: absolute dir containing exported/policy.onnx. If `dir/exported` is missing,
+//           picks the last (alphabetically) sub-folder that has one, e.g. .../velocity/v0.
 inline std::filesystem::path parser_policy_dir(std::filesystem::path policy_dir)
 {
     // Load Policy
@@ -119,6 +125,8 @@ inline std::filesystem::path parser_policy_dir(std::filesystem::path policy_dir)
 namespace po = boost::program_options;
 
 //※ This function must be called at the beginning of main() function
+// helper(argc, argv): finds the binary path, loads config.yaml, parses
+// --help / --version / --log / --network and returns the parsed options map.
 inline po::variables_map helper(int argc, char** argv) 
 {
     bin_path = get_bin_path();

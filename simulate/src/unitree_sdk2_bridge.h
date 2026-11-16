@@ -171,6 +171,12 @@ public:
             "unitree_bridge", UT_CPU_ID_NONE, 1000, [this]() { this->run(); });
     }
 
+    // run() - called at 1 kHz; makes MuJoCo look like a real Unitree robot on DDS.
+    //   1. LowCmd (from the controller, e.g. g1_ctrl) -> motor torques:
+    //        ctrl[i] = tau + kp * (q_des - q) + kd * (dq_des - dq)   (same PD as the real drivers)
+    //   2. MuJoCo sensors -> LowState message (motor q/dq/tau, IMU quaternion/rpy/gyro/acc)
+    //   3. Root position/velocity -> SportModeState (high state)
+    //   4. Gamepad -> WirelessController message (used by the joystick DSL transitions)
     virtual void run()
     {
         if(!mj_data_) return;

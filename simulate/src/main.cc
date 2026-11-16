@@ -571,6 +571,10 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
   exit(0);
 }
 
+// UnitreeSdk2BridgeThread
+//   Waits until MuJoCo has loaded the robot scene (from simulate/config.yaml), initialises
+//   DDS on the configured interface (default "lo"), and starts a G1Bridge (humanoids,
+//   many actuators) or Go2Bridge (quadrupeds) that exchanges LowCmd/LowState at 1 kHz.
 void *UnitreeSdk2BridgeThread(void *arg)
 {
   // Wait for mujoco data

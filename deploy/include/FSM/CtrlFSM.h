@@ -8,9 +8,18 @@
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
 
+// CtrlFSM - the finite state machine that owns all controller states.
+//
+// Runs a 1 kHz loop (dt = 0.001 s) in a RecurrentThread. Each tick:
+//   currentState->pre_run()  (read LowState + keyboard)
+//   currentState->run()      (write motor targets into lowcmd)
+//   currentState->post_run() (publish lowcmd to the robot)
+//   then evaluates currentState->registered_checks (joystick combos, timeouts, ...) and,
+//   if one returns true, calls exit() on the old state and enter() on the new one.
 class CtrlFSM
 {
 public:
+    // Input: a single initial state (alternative constructor, unused by main.cpp).
     CtrlFSM(std::shared_ptr<BaseState> initstate)
     {
         // Initialize FSM states
@@ -18,6 +27,11 @@ public:
 
     }
 
+    // Input: cfg = config.yaml["FSM"]. Its "_" map lists enabled states:
+    //   { <name>: { id: int, type: optional class suffix } }, e.g.
+    //   Velocity: {id: 3, type: RLBase}  ->  creates State_RLBase named "Velocity".
+    // Output: none. First fills FSMStringMap (id <-> name), then instantiates every state
+    // through the REGISTER_FSM factory map (getFsmMap()["State_<type>"]).
     CtrlFSM(YAML::Node cfg)
     {
         auto fsms = cfg["_"]; // enabled FSMs
@@ -45,7 +59,8 @@ public:
         }
     }
 
-    void start() 
+    // Enter the first state (Passive) and launch the 1 kHz FSM thread calling run_().
+    void start()
     {
         // Start From State_Passive
         currentState = states[0];
@@ -56,6 +71,7 @@ public:
         spdlog::info("FSM: Start {}", currentState->getStateString());
     }
 
+    // Add a state; exits the program if a state with the same id already exists.
     void add(std::shared_ptr<BaseState> state)
     {
         for(auto & s : states)
@@ -79,6 +95,8 @@ public:
 private:
     const double dt = 0.001;
 
+    // One FSM tick (see class comment). The first registered check that returns true
+    // decides the next state id; a transition happens only if it differs from the current.
     void run_()
     {
         currentState->pre_run();

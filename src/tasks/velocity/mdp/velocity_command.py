@@ -23,9 +23,24 @@ if TYPE_CHECKING:
 
 
 class UniformVelocityCommand(CommandTerm):
+  """Generates the "twist" command the robot must follow: (lin_vel_x, lin_vel_y, ang_vel_z).
+
+  NOTE: velocity_env_cfg.py imports UniformVelocityCommandCfg from mjlab.tasks.velocity.mdp,
+  so at runtime mjlab's identical implementation is used; this file is a local copy
+  that documents/overrides the behaviour.
+
+  State (B = num_envs):
+    vel_command_b   (B, 3) current command in the robot base frame
+    heading_target  (B,)   desired yaw (heading envs only)
+    is_heading_env  (B,)   bool, ang_vel_z is computed from heading error
+    is_standing_env (B,)   bool, command forced to zero
+    metrics["error_vel_xy"], metrics["error_vel_yaw"]  (B,) running tracking errors
+  """
+
   cfg: UniformVelocityCommandCfg
 
   def __init__(self, cfg: UniformVelocityCommandCfg, env: ManagerBasedRlEnv):
+    """Inputs: cfg (ranges, probabilities), env. Output: None (allocates buffers above)."""
     super().__init__(cfg, env)
 
     if self.cfg.heading_command and self.cfg.ranges.heading is None:
@@ -53,9 +68,12 @@ class UniformVelocityCommand(CommandTerm):
 
   @property
   def command(self) -> torch.Tensor:
+    """Output: (B, 3) tensor [vx, vy, wz] - read by observations and rewards."""
     return self.vel_command_b
 
   def _update_metrics(self) -> None:
+    """Accumulate |cmd - actual| for xy linear and yaw angular velocity (normalised by
+    the max number of steps a command can last). Output: None (updates self.metrics)."""
     max_command_time = self.cfg.resampling_time_range[1]
     max_command_step = max_command_time / self._env.step_dt
     self.metrics["error_vel_xy"] += (
@@ -70,7 +88,16 @@ class UniformVelocityCommand(CommandTerm):
     )
 
   def _resample_command(self, env_ids: torch.Tensor) -> None:
-    r = torch.empty(len(env_ids), device=self.device)
+    """Draw a new random command for the given envs.
+
+    Input:  env_ids (K,) long tensor of env indices whose command timer expired / reset.
+    Output: None.
+    How: vx, vy, wz ~ Uniform(cfg.ranges); commands with norm <= 0.1 are zeroed;
+         a fraction becomes heading envs (new heading target) or standing envs;
+         with prob. init_velocity_prob the robot's root velocity is set to the command
+         so it starts already moving.
+    """
+    r =torch.empty(len(env_ids), device=self.device)
     self.vel_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.lin_vel_x)
     self.vel_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.lin_vel_y)
     self.vel_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)
@@ -97,6 +124,8 @@ class UniformVelocityCommand(CommandTerm):
       self.robot.write_root_state_to_sim(root_state, init_vel_env_ids)
 
   def _update_command(self) -> None:
+    """Called every step. For heading envs: wz = clip(stiffness * wrap(heading_target -
+    heading)). For standing envs: command = 0. Output: None."""
     if self.cfg.heading_command:
       self.heading_error = wrap_to_pi(self.heading_target - self.robot.data.heading_w)
       env_ids = self.is_heading_env.nonzero(as_tuple=False).flatten()
@@ -116,7 +145,11 @@ class UniformVelocityCommand(CommandTerm):
     server: "viser.ViserServer",
     get_env_idx: Callable[[], int],
   ) -> None:
-    """Create velocity joystick sliders in the Viser viewer."""
+    """Create velocity joystick sliders in the Viser viewer.
+
+    Inputs: folder name, viser server, get_env_idx() -> index of the env being watched.
+    Output: None. Stores slider handles used by compute() to override the command.
+    """
     from viser import Icon
 
     ranges = self.cfg.ranges
@@ -167,6 +200,8 @@ class UniformVelocityCommand(CommandTerm):
     self._joystick_get_env_idx = get_env_idx
 
   def compute(self, dt: float) -> None:
+    """Normal command update (timers/resampling/heading) then, if the viewer joystick is
+    enabled, overwrite the watched env's command with the slider values."""
     super().compute(dt)
     if self._joystick_enabled is not None and self._joystick_enabled.value:
       assert self._joystick_get_env_idx is not None
@@ -177,7 +212,11 @@ class UniformVelocityCommand(CommandTerm):
   # Visualization.
 
   def _debug_vis_impl(self, visualizer: "DebugVisualizer") -> None:
-    """Draw velocity command and actual velocity arrows."""
+    """Draw velocity command and actual velocity arrows.
+
+    Blue = commanded linear vel, green = commanded yaw rate,
+    cyan = actual linear vel, light green = actual yaw rate (drawn above the robot).
+    """
     env_indices = visualizer.get_env_indices(self.num_envs)
     if not env_indices:
       return
@@ -248,6 +287,17 @@ class UniformVelocityCommand(CommandTerm):
 
 @dataclass(kw_only=True)
 class UniformVelocityCommandCfg(CommandTermCfg):
+  """Config of UniformVelocityCommand.
+
+  entity_name: scene entity to command ("robot").
+  heading_command / heading_control_stiffness: yaw-rate from heading error (P-controller).
+  rel_standing_envs: fraction of envs commanded to stand still.
+  rel_heading_envs:  fraction of envs using heading control.
+  init_velocity_prob: probability of initialising root velocity = command.
+  ranges: Ranges(lin_vel_x, lin_vel_y, ang_vel_z, heading) - (min, max) tuples.
+  viz: arrow drawing offset/scale.  build(env) -> UniformVelocityCommand.
+  """
+
   entity_name: str
   heading_command: bool = False
   heading_control_stiffness: float = 1.0

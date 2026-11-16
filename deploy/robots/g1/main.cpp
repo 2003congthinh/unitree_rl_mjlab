@@ -8,6 +8,15 @@ std::unique_ptr<LowCmd_t> FSMState::lowcmd = nullptr;
 std::shared_ptr<LowState_t> FSMState::lowstate = nullptr;
 std::shared_ptr<Keyboard> FSMState::keyboard = std::make_shared<Keyboard>();
 
+// ENTRY POINT of the deployment program (g1_ctrl). Other robots' main.cpp are the same
+// except for the robot type / mode_machine check.
+//
+// init_fsm_state()
+//   Input : none (uses the global DDS ChannelFactory initialised in main()).
+//   Output: none. Creates the shared FSMState::lowcmd publisher ("rt/lowcmd") and
+//           FSMState::lowstate subscriber, then blocks until the robot (or the
+//           simulator in simulate/) publishes its first LowState message.
+//   It also refuses to start if another process is already publishing on rt/lowcmd.
 void init_fsm_state()
 {
     auto lowcmd_sub = std::make_shared<unitree::robot::g1::subscription::LowCmd>();
@@ -25,6 +34,13 @@ void init_fsm_state()
     spdlog::info("Connected to robot.");
 }
 
+// main(argc, argv)
+//   Input : CLI flags (--network=<iface>, "lo" for simulation, e.g. "enp5s0" for the robot).
+//   Output: never returns normally.
+//   Flow  : param::helper() loads config/config.yaml -> DDS init on the interface ->
+//           init_fsm_state() -> check robot is a 29-DoF G1 (mode_machine 5) ->
+//           CtrlFSM(config["FSM"]) builds Passive / FixStand / Velocity(RLBase) / Mimic
+//           states -> fsm->start() runs the 1 kHz state-machine thread; main just sleeps.
 int main(int argc, char** argv)
 {
     // Load parameters

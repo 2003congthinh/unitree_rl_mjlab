@@ -11,6 +11,9 @@ namespace isaaclab
 
 class MotionLoader;
 
+// ArticulationData - the robot state seen by observation functions.
+// joint_* vectors are in POLICY order; joint_ids_map[i] gives the SDK motor index of
+// policy joint i. joint_stiffness / joint_damping are in SDK order.
 struct ArticulationData
 {
     Eigen::Vector3f GRAVITY_VEC_W = Eigen::Vector3f(0.0f, 0.0f, -1.0f);

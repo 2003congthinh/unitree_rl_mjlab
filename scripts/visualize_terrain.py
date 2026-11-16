@@ -76,6 +76,21 @@ PARAM_HINTS = {
 
 
 class _AppState(TypedDict):
+  """Mutable GUI state shared by all callbacks in main().
+
+  Structure:
+    preset_name:      "All Terrains" or one key of ALL_TERRAINS_CFG.sub_terrains
+    robot_name:       key of ROBOT_CFG_GETTERS ("None", "Unitree Go1", ...)
+    seed:             RNG seed for the terrain generator
+    size:             (x, y) size in metres of one terrain tile
+    params:           {field_name: value} or {field_name+"_min"/"_max": value}
+                      = slider overrides of the selected sub-terrain config
+    rows, cols:       grid size (rows = difficulty levels)
+    difficulty_range: (min, max) difficulty mapped onto the rows
+    robot_handles:    viser scene handles of spawned robot meshes
+    terrain_origins:  (rows, cols, 3) array of tile centres (spawn points)
+  """
+
   preset_name: str
   robot_name: str
   seed: int
@@ -89,6 +104,22 @@ class _AppState(TypedDict):
 
 
 def main():
+  """Start a Viser web server (http://localhost:8080) showing the procedural terrains.
+
+  Input:  none (all interaction happens in the browser GUI).
+  Output: none (runs forever).
+
+  How it works:
+    - update_terrain(): builds a TerrainGeneratorCfg from the GUI state, compiles it to a
+      MuJoCo model, merges all terrain geoms into one trimesh and uploads it to the browser.
+    - update_robots(): compiles the selected robot alone in its init pose and instances one
+      copy of its visual mesh on every terrain tile origin.
+    - rebuild_gui(): creates sliders/checkboxes for every numeric/bool field of the
+      selected sub-terrain dataclass; each widget writes into state["params"] and
+      re-runs update_terrain().
+  This answers "what will the robot have to walk on during rough-terrain training, and how
+  does difficulty grow from row 0 (easy) to row N (hard)?".
+  """
   server = viser.ViserServer()
 
   # Load available terrains from config.
@@ -119,6 +150,10 @@ def main():
     polygon_count_label = server.gui.add_markdown("**Number of Polygons:** -")
 
   def update_robots():
+    """Re-spawn the selected robot mesh on every terrain tile.
+
+    Input: state["robot_name"], state["terrain_origins"]. Output: None (updates viser scene).
+    """
     # Clear old robot handles.
     for h in state["robot_handles"]:
       h.remove()
@@ -204,6 +239,12 @@ def main():
     status_label.content = "**Status:** Ready"
 
   def update_terrain():
+    """Regenerate the terrain grid from the current GUI state and upload it.
+
+    Input: state (preset, params, seed, rows, cols ...). Output: None.
+    Side effects: replaces the "/terrain" mesh, stores state["terrain_origins"],
+    updates the polygon counter, then calls update_robots().
+    """
     nonlocal terrain_handle
     status_label.content = "**Status:** Generating terrain..."
 
@@ -311,6 +352,11 @@ def main():
   param_controls: List[Any] = []
 
   def rebuild_gui():
+    """Rebuild the "Terrain Parameters" panel for the selected preset.
+
+    Input: state["preset_name"]. Output: None. Each dataclass field becomes a widget:
+    *_range tuples -> min/max sliders, float/int -> slider, bool -> checkbox.
+    """
     nonlocal param_controls
     for control in param_controls:
       control.remove()

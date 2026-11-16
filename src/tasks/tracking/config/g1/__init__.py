@@ -1,3 +1,6 @@
+# Registers the G1 motion-tracking tasks (same mechanism as velocity/config/g1/__init__.py):
+#   "Unitree-G1-Tracking"                     actor sees anchor position + base lin. velocity
+#   "Unitree-G1-Tracking-No-State-Estimation" actor without them (deployable on the robot)
 from mjlab.tasks.registry import register_mjlab_task
 from src.tasks.tracking.rl import MotionTrackingOnPolicyRunner
 

@@ -1,4 +1,11 @@
-"""Unitree Go2 constants."""
+"""Unitree Go2 constants.
+
+Describes the Go2 quadruped (12 DoF: hip/thigh/calf x 4 legs) for mjlab:
+MJCF (xmls/go2.xml) -> get_spec(); hand-tuned PD gains per joint group
+(GO2_ACTUATOR_HIP/THIGH/CALF); standing pose INIT_STATE; collisions;
+get_go2_robot_cfg() -> EntityCfg used by src/tasks/velocity/config/go2/env_cfgs.py.
+A2 / As2 constant files follow the same layout.
+"""
 
 from pathlib import Path
 
@@ -22,12 +29,14 @@ assert GO2_XML.exists()
 
 
 def get_assets(meshdir: str) -> dict[str, bytes]:
+  """Input: meshdir prefix. Output: {"<meshdir>/<file>": bytes} of all mesh files."""
   assets: dict[str, bytes] = {}
   update_assets(assets, GO2_XML.parent / "assets", meshdir)
   return assets
 
 
 def get_spec() -> mujoco.MjSpec:
+  """Output: mujoco.MjSpec parsed from go2.xml with mesh assets attached."""
   spec = mujoco.MjSpec.from_file(str(GO2_XML))
   spec.assets = get_assets(spec.meshdir)
   return spec
@@ -130,6 +139,9 @@ def get_go2_robot_cfg() -> EntityCfg:
 
   Returns a new EntityCfg instance each time to avoid mutation issues when
   the config is shared across multiple places.
+
+  Output: EntityCfg(init_state=INIT_STATE, collisions=(FULL_COLLISION,),
+                    spec_fn=get_spec, articulation=GO2_ARTICULATION).
   """
   return EntityCfg(
     init_state=INIT_STATE,

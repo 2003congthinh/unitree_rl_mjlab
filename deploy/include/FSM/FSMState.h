@@ -6,10 +6,18 @@
 #include "isaaclab/devices/keyboard/keyboard.h"
 #include "unitree_joystick_dsl.hpp"
 
+// FSMState - BaseState + robot I/O shared by all concrete states.
+//   static lowcmd   : motor command message published to the robot (q, dq, kp, kd, tau per motor)
+//   static lowstate : latest robot state (IMU, motor q/dq, joystick) received over DDS
+//   static keyboard : optional keyboard input (for keyboard_velocity_commands)
 class FSMState : public BaseState
 {
 public:
-    FSMState(int state, std::string state_string) 
+    // Inputs: state id and name. Reads config["FSM"][name]["transitions"], a map
+    //   { target_state_name: "joystick DSL expression" }, e.g. { FixStand: "LT + up.on_pressed" },
+    // compiles each expression (unitree_joystick_dsl.hpp) into a check on lowstate->joystick,
+    // and adds a global safety check: if LowState times out -> go to "Passive".
+    FSMState(int state, std::string state_string)
     : BaseState(state, state_string) 
     {
         spdlog::info("Initializing State_{} ...", state_string);
@@ -53,12 +61,14 @@ public:
         );
     }
 
+    // Every tick: refresh joystick edge detection and keyboard key.
     void pre_run()
     {
         lowstate->update();
         if(keyboard) keyboard->update();
     }
 
+    // Every tick: publish the motor command filled by run().
     void post_run()
     {
         lowcmd->unlockAndPublish();

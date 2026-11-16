@@ -1,3 +1,9 @@
+"""Evaluation metrics for motion tracking (not rewards; for analysis / logging).
+
+Each takes the MotionCommand term and returns a (num_envs,) tensor of errors
+(metres or radians). They are helpers: no env config in this repo wires them in yet.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

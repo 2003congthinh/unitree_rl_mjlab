@@ -1,4 +1,20 @@
-"""Script to train RL agent with RSL-RL."""
+"""Script to train RL agent with RSL-RL.
+
+ENTRY POINT of the training workflow.
+
+  python scripts/train.py <TASK_ID> [--env.xxx ...] [--agent.xxx ...] [--motion-file ...]
+
+Call graph:
+  main()
+    -> tyro parses TASK_ID, then the remaining CLI flags into a TrainConfig
+    -> launch_training(task_id, TrainConfig)
+         -> picks GPUs, creates logs/rsl_rl/<experiment>/<timestamp>/
+         -> run_train(...)  (directly, or once per GPU through torchrunx)
+              -> ManagerBasedRlEnv(env_cfg)            (mjlab simulation, N parallel robots)
+              -> RslRlVecEnvWrapper(env)               (adapts it to the rsl_rl API)
+              -> <Runner>(env, agent_cfg).learn(...)   (PPO loop; Velocity/MotionTracking runner)
+                   -> runner.save() every `save_interval` iters -> model_<it>.pt + policy.onnx
+"""
 
 import logging
 import os
@@ -22,6 +38,20 @@ from mjlab.utils.wrappers import VideoRecorder
 
 @dataclass(frozen=True)
 class TrainConfig:
+  """All settings for one training run (every field can be overridden from the CLI).
+
+  Fields:
+    env:               ManagerBasedRlEnvCfg -> scene, observations, actions, rewards,
+                       terminations, events, curriculum ... (built by the task's env_cfgs.py)
+    agent:             RslRlBaseRunnerCfg -> PPO hyper-parameters, network sizes,
+                       experiment_name, max_iterations ... (built by the task's rl_cfg.py)
+    motion_file:       path to a .npz reference motion (required only for tracking tasks)
+    video / video_length / video_interval: record training videos every N env steps
+    enable_nan_guard:  dump simulation state when NaNs appear (debugging)
+    torchrunx_log_dir: where multi-GPU worker logs go
+    gpu_ids:           list of GPU indices, "all", or None (= CPU)
+  """
+
   env: ManagerBasedRlEnvCfg
   agent: RslRlBaseRunnerCfg
   motion_file: str | None = None
@@ -34,12 +64,38 @@ class TrainConfig:
 
   @staticmethod
   def from_task(task_id: str) -> "TrainConfig":
+    """Build the default TrainConfig of a registered task.
+
+    Input:  task_id (str), e.g. "Unitree-G1-Flat".
+    Output: TrainConfig whose `env` and `agent` come from the task registry
+            (filled by register_mjlab_task(...) in src/tasks/*/config/<robot>/__init__.py).
+    """
     env_cfg = load_env_cfg(task_id)
     agent_cfg = load_rl_cfg(task_id)
     return TrainConfig(env=env_cfg, agent=agent_cfg)
 
 
 def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
+  """Train one policy (runs once per GPU worker).
+
+  Inputs:
+    task_id: registered task name (used to look up the custom Runner class).
+    cfg:     TrainConfig (env + agent settings, motion file, video flags ...).
+    log_dir: Path logs/rsl_rl/<experiment_name>/<YYYY-mm-dd_HH-MM-SS>[_run_name].
+  Output:
+    None. Side effects: checkpoints model_<iter>.pt, policy.onnx, params/env.yaml,
+    params/agent.yaml (and optional videos) are written into `log_dir`.
+
+  How it works:
+    1. Chooses the device (cpu / cuda:<LOCAL_RANK>) and a per-worker seed.
+    2. For tracking tasks, injects the absolute --motion-file path into the
+       "motion" command config.
+    3. Builds the mjlab ManagerBasedRlEnv (num_envs robots simulated in parallel on GPU),
+       optionally wraps it with VideoRecorder, then with RslRlVecEnvWrapper.
+    4. Instantiates the task's runner (VelocityOnPolicyRunner / MotionTrackingOnPolicyRunner,
+       fallback MjlabOnPolicyRunner), optionally resumes a checkpoint, dumps configs,
+       and calls runner.learn() -> PPO rollouts + updates for agent.max_iterations.
+  """
   cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
   if cuda_visible == "":
     device = "cpu"
@@ -143,7 +199,22 @@ def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
 
 
 def launch_training(task_id: str, args: TrainConfig | None = None):
-  args = args or TrainConfig.from_task(task_id)
+  """Prepare the log directory / GPU environment and start training.
+
+  Inputs:
+    task_id: registered task name.
+    args:    TrainConfig (if None, the task defaults are used).
+  Output:
+    None.
+
+  How it works:
+    - Log dir = logs/rsl_rl/<agent.experiment_name>/<timestamp>[_<run_name>].
+    - select_gpus() resolves --gpu-ids against CUDA_VISIBLE_DEVICES.
+    - 0/1 GPU  -> calls run_train() directly in this process.
+    - >1 GPUs  -> torchrunx.Launcher spawns one run_train() worker per GPU
+                  (rsl_rl then does distributed data-parallel PPO).
+  """
+  args =args or TrainConfig.from_task(task_id)
 
   # Create log directory once before launching workers.
   log_root_path = Path("logs") / "rsl_rl" / args.agent.experiment_name
@@ -193,6 +264,16 @@ def launch_training(task_id: str, args: TrainConfig | None = None):
 
 
 def main():
+  """CLI entry point.
+
+  Input:  sys.argv -> first positional arg = task id, the rest = TrainConfig overrides
+          (e.g. --env.scene.num-envs=4096 --agent.max-iterations=5000).
+  Output: None (calls launch_training).
+
+  How it works: importing `src.tasks` runs every robot's __init__.py, which calls
+  register_mjlab_task(...) and fills mjlab's global task registry; tyro then offers
+  those task ids as the valid first argument.
+  """
   # Parse first argument to choose the task.
   # Import tasks to populate the registry.
   import mjlab.tasks  # noqa: F401

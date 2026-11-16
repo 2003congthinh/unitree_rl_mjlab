@@ -16,7 +16,22 @@ from src.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 
 def unitree_g1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Create Unitree G1 rough terrain velocity configuration."""
+  """Create Unitree G1 rough terrain velocity configuration.
+
+  Input:  play (bool) - True gives the evaluation variant used by play.py.
+  Output: ManagerBasedRlEnvCfg.
+
+  How it works: starts from make_velocity_env_cfg() and fills every "Set per-robot" slot:
+    - robot entity = get_g1_robot_cfg() (MJCF + actuators + init pose)
+    - height-scan ray caster attached to "pelvis"
+    - ContactSensors: "feet_ground_contact" (ankle subtrees vs terrain) and
+      "self_collision" (robot vs itself)
+    - per-joint action scale G1_ACTION_SCALE, foot sites/geoms, torso body names,
+      per-joint pose tolerances (std_standing/walking/running), self-collision penalty.
+    - play=True: infinite episode, no obs noise, no pushes, no curriculum,
+      5x5 random terrain grid.
+  Other humanoids (g1_23dof, h1_2, h2, r1) use the same template with their own names.
+  """
   cfg = make_velocity_env_cfg()
 
   cfg.sim.mujoco.ccd_iterations = 500
@@ -166,7 +181,13 @@ def unitree_g1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
 
 def unitree_g1_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Create Unitree G1 flat terrain velocity configuration."""
+  """Create Unitree G1 flat terrain velocity configuration.
+
+  Input: play (bool). Output: ManagerBasedRlEnvCfg.
+  How: takes the rough config, swaps the terrain generator for an infinite plane,
+  removes the height-scan sensor/observations and the terrain curriculum, lowers
+  contact buffers; in play mode narrows the command ranges.
+  """
   cfg = unitree_g1_rough_env_cfg(play=play)
 
   cfg.sim.njmax = 300

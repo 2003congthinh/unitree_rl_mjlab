@@ -7,11 +7,20 @@
 #include "isaaclab/envs/mdp/actions/joint_actions.h"
 #include "isaaclab/envs/mdp/terminations.h"
 
+// State_RLBase - runs a trained velocity policy (ONNX) on the robot.
+// Two loops run in parallel:
+//   * policy thread (50 Hz = deploy.yaml step_dt): env->step() = read sensors ->
+//     build observation -> ONNX inference -> store processed action (target joint angles)
+//   * FSM thread (1 kHz): run() copies the latest target angles into lowcmd; the motor
+//     drivers' PD loop (kp, kd from deploy.yaml) tracks them.
 class State_RLBase : public FSMState
 {
 public:
+    // Constructor (src/State_RLBase.cpp): loads <policy_dir>/params/deploy.yaml and
+    // <policy_dir>/exported/policy.onnx.
     State_RLBase(int state_mode, std::string state_string);
-    
+
+    // enter(): set kp/kd from deploy.yaml stiffness/damping, then start the policy thread.
     void enter()
     {
         // set gain
@@ -47,7 +56,8 @@ public:
     }
 
     void run();
-    
+
+    // exit(): stop and join the policy thread.
     void exit()
     {
         policy_thread_running = false;

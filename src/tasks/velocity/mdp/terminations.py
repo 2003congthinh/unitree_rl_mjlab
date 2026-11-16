@@ -15,6 +15,11 @@ def illegal_contact(
   sensor_name: str,
   force_threshold: float = 10.0,
 ) -> torch.Tensor:
+  """End the episode when a forbidden body part (e.g. Go2 base/thigh) touches the ground.
+
+  Inputs: sensor_name (ContactSensor of non-foot geoms vs terrain), force_threshold (N).
+  Output: (B,) bool, True = terminate this env.
+  """
   sensor: ContactSensor = env.scene[sensor_name]
   data = sensor.data
   if data.force_history is not None:

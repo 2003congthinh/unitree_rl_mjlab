@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unitree RL Mjlab Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: sticky table of contents on the left (wide screens), one reading column on the right.
+   Colour encodes WHERE code runs: teal = Python/training, copper = C++/robot, violet = data files. */
+:root {
+  --bg: #f4f7f8;
+  --surface: #ffffff;
+  --ink: #15222b;
+  --muted: #566875;
+  --line: #d6dfe4;
+  --code-bg: #e9eff2;
+  --py: #0a7a73;
+  --py-soft: #dcf1ef;
+  --cpp: #a85a17;
+  --cpp-soft: #f6e6d6;
+  --data: #6a4ca3;
+  --data-soft: #ebe4f7;
+  --warn: #9a3b2e;
+  --warn-soft: #f7e3df;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --step--1: 0.85rem;
+  --step-0: 1rem;
+  --step-1: 1.2rem;
+  --step-2: 1.5rem;
+  --step-3: 2.1rem;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151a; --surface: #152029; --ink: #e2e9ee; --muted: #93a5b2; --line: #263540;
+    --code-bg: #1a2731; --py: #43c3b9; --py-soft: #12312f; --cpp: #e5a262; --cpp-soft: #3a2817;
+    --data: #ab93e3; --data-soft: #2a2140; --warn: #f0917f; --warn-soft: #3b1f1a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151a; --surface: #152029; --ink: #e2e9ee; --muted: #93a5b2; --line: #263540;
+  --code-bg: #1a2731; --py: #43c3b9; --py-soft: #12312f; --cpp: #e5a262; --cpp-soft: #3a2817;
+  --data: #ab93e3; --data-soft: #2a2140; --warn: #f0917f; --warn-soft: #3b1f1a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.65;
+}
+img { max-width: 100%; }
+a { color: var(--py); text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--py); outline-offset: 2px; border-radius: 3px; }
+
+.shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-block: 2rem 4rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (min-width: 1100px) {
+  .shell { grid-template-columns: 240px minmax(0, 1fr); }
+  nav.toc { position: sticky; top: 1.5rem; align-self: start; max-height: calc(100vh - 3rem); overflow-y: auto; }
+}
+nav.toc { font-size: var(--step--1); }
+nav.toc h2 { font-family: var(--font-display); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.5rem; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+nav.toc a { color: var(--ink); text-decoration: none; display: block; padding: 0.2rem 0.5rem; border-radius: 4px; }
+nav.toc a:hover { background: var(--code-bg); }
+nav.toc .sub a { padding-left: 1.2rem; color: var(--muted); }
+@media (max-width: 1099px) {
+  nav.toc { border: 1px solid var(--line); border-radius: 8px; padding: 1rem; background: var(--surface); }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+
+main { min-width: 0; }
+.prose { max-width: 70ch; }
+header.hero { border-bottom: 1px solid var(--line); padding-bottom: 2rem; margin-bottom: 1rem; }
+.eyebrow { font-family: var(--font-mono); font-size: var(--step--1); color: var(--muted); letter-spacing: 0.04em; }
+h1, h2, h3, h4 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; }
+h1 { font-size: var(--step-3); margin: 0.4rem 0 0.8rem; }
+h2 { font-size: var(--step-2); margin: 3.5rem 0 0.8rem; padding-top: 0.5rem; }
+h3 { font-size: var(--step-1); margin: 2.2rem 0 0.6rem; }
+h4 { font-size: var(--step-0); margin: 1.4rem 0 0.4rem; }
+p { margin: 0 0 1rem; }
+.lede { font-size: var(--step-1); color: var(--muted); max-width: 62ch; }
+
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+:not(pre) > code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+pre.cmd {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.9rem 1rem; overflow-x: auto; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55;
+  margin: 0 0 1.2rem;
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin: 1.2rem 0 0; font-size: var(--step--1); }
+.pill { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em; padding: 0.1rem 0.55rem; border-radius: 999px; white-space: nowrap; }
+.pill.py { background: var(--py-soft); color: var(--py); }
+.pill.cpp { background: var(--cpp-soft); color: var(--cpp); }
+.pill.data { background: var(--data-soft); color: var(--data); }
+
+.stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.1rem; display: grid; gap: 0.35rem; align-content: start; }
+.stage h4 { margin: 0; }
+.stage p { margin: 0; font-size: var(--step--1); color: var(--muted); }
+.stage .mono { font-size: 0.78rem; color: var(--ink); }
+
+figure.diagram {
+  margin: 1.5rem 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 1rem; overflow-x: auto;
+}
+figure.diagram figcaption { font-size: var(--step--1); color: var(--muted); margin-top: 0.6rem; max-width: 75ch; }
+figure.diagram pre.mermaid { margin: 0; display: flex; justify-content: center; min-width: min-content; background: transparent; }
+figure.diagram pre.fallback { font-family: var(--font-mono); font-size: 0.78rem; white-space: pre; margin: 0; }
+
+.callout { border-left: 3px solid var(--py); background: var(--surface); padding: 0.8rem 1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; max-width: 70ch; }
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.callout p:last-child { margin-bottom: 0; }
+
+.table-wrap { overflow-x: auto; margin: 0.8rem 0 1.4rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; line-height: 1.5; }
+th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: none; }
+th { font-family: var(--font-display); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); background: var(--code-bg); white-space: nowrap; }
+td.fn { font-family: var(--font-mono); font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 0.8rem; white-space: nowrap; }
+td.pos { color: var(--py); }
+td.neg { color: var(--warn); }
+.reftable td:nth-child(2) { min-width: 15rem; }
+.reftable td:nth-child(3) { min-width: 18rem; }
+.reftable td:nth-child(4) { min-width: 13rem; color: var(--muted); }
+
+.filecard { margin: 1.6rem 0 2rem; }
+.filecard .fhead { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; }
+.filecard .fhead h4 { margin: 0; font-family: var(--font-mono); font-size: 0.92rem; overflow-wrap: anywhere; }
+.filecard > p { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.92rem; max-width: 80ch; }
+.group-title { margin-top: 3rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--line); }
+
+.gallery { display: grid; gap: 1.8rem; margin: 1.5rem 0; }
+.gal-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
+.gal-row figure { margin: 0; display: grid; gap: 0.4rem; align-content: start; }
+.gal-row img { width: 100%; aspect-ratio: 5 / 3; object-fit: cover; border-radius: 6px; background: var(--code-bg); max-width: 100%; }
+.gal-row figcaption { font-size: var(--step--1); color: var(--muted); }
+.gal-text { grid-column: 1 / -1; display: grid; gap: 0.3rem; font-size: 0.92rem; }
+.gal-text h4 { margin: 0; }
+.gal-text p { margin: 0; }
+.qa { font-weight: 600; color: var(--ink); }
+
+dl.gloss { display: grid; grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr); gap: 0.5rem 1.2rem; max-width: 80ch; }
+dl.gloss dt { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; }
+dl.gloss dd { margin: 0; }
+@media (max-width: 560px) { dl.gloss { grid-template-columns: 1fr; } dl.gloss dd { margin-bottom: 0.6rem; } }
+
+footer { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--line); font-size: var(--step--1); color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#what">What this project does</a></li>
+    <li><a href="#primer">RL in two minutes</a></li>
+    <li><a href="#map">The whole map</a></li>
+    <li><a href="#train">Path 1 · Training a walking policy</a></li>
+    <li class="sub"><a href="#step">Inside one control step</a></li>
+    <li class="sub"><a href="#rewards">What the robot is rewarded for</a></li>
+    <li><a href="#mimic">Path 2 · Teaching a dance</a></li>
+    <li><a href="#play">Checking the result</a></li>
+    <li><a href="#deploy">Path 3 · Simulation to real robot</a></li>
+    <li class="sub"><a href="#contract">How Python and C++ agree</a></li>
+    <li><a href="#pictures">Pictures and what they tell you</a></li>
+    <li><a href="#reference">File &amp; function reference</a></li>
+    <li class="sub"><a href="#ref-scripts">scripts/</a></li>
+    <li class="sub"><a href="#ref-velocity">src/tasks/velocity</a></li>
+    <li class="sub"><a href="#ref-tracking">src/tasks/tracking</a></li>
+    <li class="sub"><a href="#ref-assets">src/assets</a></li>
+    <li class="sub"><a href="#ref-deploy">deploy/</a></li>
+    <li class="sub"><a href="#ref-sim">simulate/</a></li>
+    <li><a href="#caveats">Things to watch out for</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="hero">
+  <div class="eyebrow">unitree_rl_mjlab · project guide</div>
+  <h1>How a Unitree robot learns to walk and dance in this repository</h1>
+  <p class="lede">This page follows the code from the first command you type to the moment a real G1 humanoid takes a step. It explains each stage, the files involved, and how the functions call one another.</p>
+  <div class="legend" aria-label="Colour legend">
+    <span class="pill py">Python · runs during training</span>
+    <span class="pill cpp">C++ · runs on / next to the robot</span>
+    <span class="pill data">data file passed between stages</span>
+  </div>
+</header>
+
+<section id="what" class="prose">
+  <h2>What this project does</h2>
+  <p>Unitree sells legged robots: the quadrupeds <strong>Go2</strong>, <strong>A2</strong> and <strong>As2</strong>, and the humanoids <strong>G1</strong> (29 or 23 joints), <strong>H1_2</strong>, <strong>H2</strong> and <strong>R1</strong>. Nobody writes the walking controller for these robots by hand here. A neural network learns it by trial and error inside a physics simulator, and the finished network is then copied onto the robot.</p>
+  <p>The repository supports two skills:</p>
+  <ul>
+    <li><strong>Velocity tracking.</strong> The robot receives a command such as "walk forward at 0.8 m/s and turn left at 0.3 rad/s" and must follow it on flat or rough ground. All seven robots can learn this.</li>
+    <li><strong>Motion imitation.</strong> The robot watches a recorded human motion, for example a dance, and copies it with its whole body. This follows the BeyondMimic method and is set up for the G1 (29 and 23 DoF).</li>
+  </ul>
+  <p>The heavy lifting is done by two libraries this repo builds on. <code>mjlab</code> runs thousands of copies of the robot in parallel on the GPU using MuJoCo-Warp physics and provides the "manager" framework (observations, rewards, and so on). <code>rsl_rl</code> provides the PPO learning algorithm. This repository supplies the robot models, the task definitions (what to observe, what to reward), the training scripts, and the C++ program that runs the trained network on the real hardware.</p>
+  <p>The README summarises the work as <strong>Train → Play → Sim2Real</strong>. This guide uses the same three stages.</p>
+</section>
+
+<section id="primer" class="prose">
+  <h2>RL in two minutes</h2>
+  <p>Reinforcement learning (RL) trains a <em>policy</em>: a function that looks at what the robot senses right now and decides what to do next. Here the policy is a small neural network (three layers of 512, 256 and 128 neurons).</p>
+  <p>Fifty times per second the loop goes like this. The simulator hands the policy an <strong>observation</strong>: a vector of numbers such as the body's tilt, joint angles, joint speeds and the current command. The policy outputs an <strong>action</strong>: one number per joint, which becomes a target angle for that joint's motor. The simulator moves the physics forward 20 ms and computes a <strong>reward</strong>, a score that is high when the robot did what we wanted (followed the command, stayed upright) and low when it did something bad (fell, slipped, jerked its joints). If the robot falls, the episode <strong>terminates</strong> and that copy of the robot is reset.</p>
+  <p>The PPO algorithm adjusts the network's weights so that actions leading to more total reward become more likely. Because the simulator runs 4,096 robots at once, the network sees millions of steps per minute and learns in hours instead of years.</p>
+  <p>Two networks are trained together. The <strong>actor</strong> is the policy and only sees what a real robot could measure. The <strong>critic</strong> estimates how good a situation is and is allowed extra "privileged" information (true body velocity, foot contact forces) that only the simulator knows. Only the actor is copied to the robot.</p>
+</section>
+
+<section id="map">
+  <h2>The whole map</h2>
+  <div class="prose">
+    <p>The diagram shows the four folders that matter and the files that travel between them. Python code in <code>scripts/</code> and <code>src/</code> produces a trained network. The C++ program in <code>deploy/</code> loads that network and talks to either the real robot or a MuJoCo stand-in from <code>simulate/</code>, using Unitree's DDS messaging.</p>
+  </div>
+  <figure class="diagram">
+<script type="text/x-mermaid">
+flowchart TB
+  subgraph PY["Python · training side (scripts/, src/)"]
+    direction LR
+    CSV["motion .csv<br/>(human dance, retargeted)"]:::data --> C2N["scripts/csv_to_npz.py"]:::py
+    C2N --> NPZ["motion .npz"]:::data
+    REG["src/tasks/.../config/ROBOT/__init__.py<br/>register_mjlab_task()"]:::py --> TR["scripts/train.py"]:::py
+    AST["src/assets/robots<br/>MJCF + motor models"]:::py --> REG
+    NPZ --> TR
+    TR --> CK["logs/rsl_rl/EXPERIMENT/RUN/<br/>model_N.pt + policy.onnx"]:::data
+    CK --> PL["scripts/play.py<br/>MuJoCo / Viser viewer"]:::py
+  end
+  subgraph CPP["C++ · deployment side (deploy/, simulate/)"]
+    direction LR
+    CTRL["deploy/robots/g1 → g1_ctrl<br/>state machine + ONNX Runtime"]:::cpp
+    SIM["simulate → unitree_mujoco<br/>(sim-to-sim test)"]:::cpp
+    ROBOT["real robot"]:::cpp
+    CTRL <-->|"DDS on lo"| SIM
+    CTRL <-->|"DDS on Ethernet"| ROBOT
+  end
+  CK -->|"copy policy.onnx to config/policy/.../exported"| CTRL
+  NPZ -->|"copy to config/policy/mimic/.../params"| CTRL
+  classDef py stroke:@py,stroke-width:2px
+  classDef cpp stroke:@cpp,stroke-width:2px
+  classDef data stroke:@data,stroke-width:2px,stroke-dasharray:4 3
+</script>
+    <figcaption>Teal boxes are Python, copper boxes are C++, dashed violet boxes are files handed from one stage to the next. Copying <code>policy.onnx</code> into the deploy folder is a manual step described in the README.</figcaption>
+  </figure>
+
+  <div class="stages">
+    <div class="stage"><span class="pill data">optional · data prep</span><h4>Prepare motion</h4><p>Convert a dance CSV into a full-body reference file.</p><span class="mono">python scripts/csv_to_npz.py</span></div>
+    <div class="stage"><span class="pill py">train</span><h4>Train</h4><p>Thousands of simulated robots learn in parallel with PPO.</p><span class="mono">python scripts/train.py Unitree-G1-Flat</span></div>
+    <div class="stage"><span class="pill py">play</span><h4>Play</h4><p>Watch the trained network control the robot in a viewer.</p><span class="mono">python scripts/play.py … --checkpoint-file=…</span></div>
+    <div class="stage"><span class="pill cpp">sim2real</span><h4>Deploy</h4><p>Run the network in C++, first against MuJoCo, then on hardware.</p><span class="mono">./g1_ctrl --network=lo</span></div>
+  </div>
+</section>
+
+<section id="train">
+  <h2>Path 1 · Training a walking policy</h2>
+  <div class="prose">
+    <p>Everything starts with one line:</p>
+  </div>
+  <pre class="cmd">python scripts/train.py Unitree-G1-Flat --env.scene.num-envs=4096</pre>
+  <div class="prose">
+    <p><strong>Step 1: the task catalogue is filled.</strong> <code>main()</code> in <code>train.py</code> executes <code>import src.tasks</code>. That package's <code>__init__.py</code> calls mjlab's <code>import_packages</code>, which imports every sub-folder. Each robot folder, for example <code>src/tasks/velocity/config/g1/__init__.py</code>, then calls <code>register_mjlab_task(...)</code> with four things: a task id (<code>"Unitree-G1-Flat"</code>), an environment config for training, an environment config for playing, an RL config, and a runner class. After the import, mjlab's registry knows every task, and <code>scripts/list_envs.py</code> can print them.</p>
+    <p><strong>Step 2: the configuration is assembled.</strong> <code>TrainConfig.from_task("Unitree-G1-Flat")</code> fetches the registered configs. The environment config was built by <code>unitree_g1_flat_env_cfg()</code>, which itself calls <code>unitree_g1_rough_env_cfg()</code>, which starts from the robot-independent template <code>make_velocity_env_cfg()</code> and fills in G1-specific names (the pelvis for the height scanner, the ankle links for foot contacts, the torso for orientation penalties) and the G1 motor model from <code>get_g1_robot_cfg()</code>. Any <code>--env.*</code> or <code>--agent.*</code> flag on the command line overrides a field of this config through the <code>tyro</code> library.</p>
+    <p><strong>Step 3: the run is launched.</strong> <code>launch_training()</code> creates the log folder <code>logs/rsl_rl/g1_velocity/&lt;date_time&gt;/</code>, selects GPUs, and calls <code>run_train()</code> directly (one GPU) or once per GPU through <code>torchrunx</code>.</p>
+    <p><strong>Step 4: the world is built.</strong> <code>run_train()</code> creates <code>ManagerBasedRlEnv(cfg.env)</code>. mjlab compiles the robot's MJCF, the terrain and the sensors into one MuJoCo model, copies it 4,096 times on the GPU, and creates one "manager" per config section (observations, actions, commands, rewards, terminations, events, curriculum). The env is wrapped in <code>RslRlVecEnvWrapper</code> so rsl_rl can use it.</p>
+    <p><strong>Step 5: learning.</strong> The task's runner, <code>VelocityOnPolicyRunner</code>, is created and <code>runner.learn()</code> starts the PPO loop: collect 24 steps from every robot (about 98,000 transitions), update the networks for 5 epochs, repeat up to 10,001 times. Every 100 iterations <code>save()</code> writes <code>model_&lt;iter&gt;.pt</code> and also exports the actor as <code>policy.onnx</code>, the file the robot will use.</p>
+  </div>
+  <figure class="diagram">
+<script type="text/x-mermaid">
+flowchart TD
+  A["train.py · main()"]:::py --> B["import src.tasks<br/>every config/ROBOT/__init__.py runs register_mjlab_task()"]:::py
+  B --> C["tyro picks TASK_ID and parses --env.* / --agent.* flags"]:::py
+  C --> D["TrainConfig.from_task()<br/>load_env_cfg() + load_rl_cfg()"]:::py
+  D --> E["launch_training()<br/>log dir, GPU selection"]:::py
+  E -->|"0 or 1 GPU"| F["run_train()"]:::py
+  E -->|"N GPUs via torchrunx"| F
+  F --> G["ManagerBasedRlEnv(env_cfg)<br/>4096 robots on GPU"]:::py
+  G --> H["RslRlVecEnvWrapper"]:::py
+  H --> I["VelocityOnPolicyRunner<br/>or MotionTrackingOnPolicyRunner"]:::py
+  I --> J["runner.learn()<br/>PPO: rollout 24 steps → update → repeat"]:::py
+  J -->|"every save_interval"| K["runner.save()"]:::py
+  K --> L["model_N.pt"]:::data
+  K --> M["policy.onnx (+ metadata)"]:::data
+  classDef py stroke:@py,stroke-width:2px
+  classDef data stroke:@data,stroke-width:2px,stroke-dasharray:4 3
+</script>
+    <figcaption>Call graph of <code>scripts/train.py</code>. Each box is a function or object; arrows mean "calls" or "creates".</figcaption>
+  </figure>
+
+  <h3 id="step">Inside one control step</h3>
+  <div class="prose">
+    <p>The physics runs at 200 Hz (timestep 0.005 s) but the policy only decides every fourth physics step (<code>decimation = 4</code>), so the policy runs at 50 Hz. Each call to <code>env.step(actions)</code> runs the managers in a fixed order. The diagram is worth reading slowly, because every function in <code>src/tasks/*/mdp/</code> plugs into one of these boxes.</p>
+  </div>
+  <figure class="diagram">
+<script type="text/x-mermaid">
+flowchart LR
+  P["actor network<br/>(policy)"]:::py -->|"actions (B × J)"| A["Action manager<br/>JointPositionAction<br/>target = default + scale·a"]:::py
+  A --> S["Physics ×4<br/>PD motors track targets<br/>MuJoCo-Warp, 5 ms each"]:::py
+  S --> T["Termination manager<br/>time_out, fell_over, illegal_contact"]:::py
+  T --> R["Reward manager<br/>Σ weight · term(env) · dt"]:::py
+  R --> X["Reset finished envs<br/>events(reset), curriculum,<br/>command resample"]:::py
+  X --> C["Command manager<br/>UniformVelocityCommand.compute()"]:::py
+  C --> E["Interval events<br/>push_robot every 5–6 s"]:::py
+  E --> O["Observation manager<br/>actor group + critic group"]:::py
+  O -->|"obs"| P
+  classDef py stroke:@py,stroke-width:2px
+</script>
+    <figcaption>One 20 ms step. B is the number of parallel robots, J the number of joints. The order follows mjlab's <code>ManagerBasedRlEnv.step()</code>.</figcaption>
+  </figure>
+  <div class="prose">
+    <p><strong>Observations.</strong> For the G1 velocity task the actor receives the angular velocity from the pelvis IMU, the gravity direction in the body frame (which tells it how tilted it is), the three-number command, a gait clock <code>phase</code> (sine and cosine of a 0.6 s cycle), joint angles relative to the default pose, joint velocities, and the previous action. On rough terrain it also gets a 17×11 grid of ground heights from a downward ray-cast sensor. Uniform noise is added to each term so the network learns to cope with imperfect sensors. The critic gets all of that without noise, plus the true linear velocity, foot heights, foot air time, contacts and contact forces.</p>
+    <p><strong>Actions.</strong> The network outputs one number per joint. <code>JointPositionAction</code> turns it into a target angle: <code>target = default_angle + scale × action</code>. For the G1 the scale per joint is <code>0.25 × torque_limit / stiffness</code> (computed in <code>g1_constants.py</code>), so an action of 1.0 asks for about a quarter of that motor's torque. The motors themselves are simulated as PD controllers whose stiffness and damping are derived from the real rotor inertia, tuned to a 10 Hz natural frequency.</p>
+    <p><strong>Commands.</strong> <code>UniformVelocityCommand</code> draws a random target (forward speed, sideways speed, turn rate) every 3 to 8 seconds. 5 % of robots are told to stand still. Some robots get a heading target instead of a turn rate and a small proportional controller converts heading error into turn rate.</p>
+    <p><strong>Events and domain randomisation.</strong> At start-up every robot gets random foot friction (0.3–1.6), a random joint-encoder offset and a shifted torso centre of mass. During the episode it is shoved every 5–6 seconds. At reset its position and heading are randomised. This variety is what lets a network trained in simulation survive the differences of the real world.</p>
+    <p><strong>Curriculum.</strong> Two curricula make the task harder as the robot improves. <code>terrain_levels_vel</code> moves a robot to a harder row of terrain when it walked far enough and to an easier one when it walked less than half of what its command asked. <code>commands_vel</code> widens the speed ranges after 120,000 steps (5,000 iterations × 24).</p>
+  </div>
+
+  <h3 id="rewards">What the robot is rewarded for</h3>
+  <div class="prose">
+    <p>The reward is the only way to tell the robot what "good walking" means. It is a weighted sum of terms; each term is a function in <code>src/tasks/velocity/mdp/rewards.py</code> (or mjlab's built-ins) returning one number per robot. Positive weights are bonuses and negative weights are penalties. The tracking terms use the shape <code>exp(-error² / std²)</code>, which gives 1.0 for perfect tracking and falls smoothly toward 0.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Term</th><th>Weight</th><th>Function</th><th>What it encourages</th></tr></thead>
+      <tbody>
+        <tr><td>track_linear_velocity</td><td class="num pos">+1.0</td><td class="fn">track_linear_velocity</td><td>Move at the commanded forward and sideways speed (std 0.5 m/s) without bouncing vertically.</td></tr>
+        <tr><td>track_angular_velocity</td><td class="num pos">+1.0</td><td class="fn">track_angular_velocity</td><td>Turn at the commanded yaw rate without rolling or pitching.</td></tr>
+        <tr><td>pose</td><td class="num pos">+1.0</td><td class="fn">variable_posture</td><td>Stay close to the default posture, with per-joint tolerance that loosens when walking and running.</td></tr>
+        <tr><td>foot_gait</td><td class="num pos">+0.5</td><td class="fn">feet_gait</td><td>Put each foot down and lift it at the right moment of the 0.6 s gait clock (alternating for bipeds, trot for quadrupeds).</td></tr>
+        <tr><td>body_orientation_l2</td><td class="num neg">−1.0</td><td class="fn">body_orientation_l2</td><td>Keep the torso upright.</td></tr>
+        <tr><td>foot_clearance</td><td class="num neg">−1.0</td><td class="fn">feet_clearance</td><td>Lift swinging feet to 10 cm.</td></tr>
+        <tr><td>stand_still</td><td class="num neg">−1.0</td><td class="fn">stand_still</td><td>Keep joints at the default pose when the command is zero.</td></tr>
+        <tr><td>self_collisions (G1)</td><td class="num neg">−1.0</td><td class="fn">self_collision_cost</td><td>Avoid knocking limbs together.</td></tr>
+        <tr><td>foot_slip</td><td class="num neg">−0.25</td><td class="fn">feet_slip</td><td>Do not slide a foot that is on the ground.</td></tr>
+        <tr><td>body_ang_vel</td><td class="num neg">−0.05</td><td class="fn">body_angular_velocity_penalty</td><td>Avoid wobbling the torso.</td></tr>
+        <tr><td>action_rate_l2</td><td class="num neg">−0.05</td><td class="fn">mjlab built-in</td><td>Change actions smoothly between steps (avoids motor jitter).</td></tr>
+        <tr><td>angular_momentum</td><td class="num neg">−0.025</td><td class="fn">angular_momentum_penalty</td><td>Keep whole-body spin small, which produces natural arm swing.</td></tr>
+        <tr><td>soft_landing</td><td class="num neg">−0.001</td><td class="fn">soft_landing</td><td>Land feet gently.</td></tr>
+        <tr><td>joint_acc_l2</td><td class="num neg">−2.5e-7</td><td class="fn">mjlab built-in</td><td>Avoid violent joint accelerations.</td></tr>
+        <tr><td>joint_pos_limits</td><td class="num neg">−10</td><td class="fn">mjlab built-in</td><td>Stay away from joint end-stops.</td></tr>
+        <tr><td>is_terminated</td><td class="num neg">−200</td><td class="fn">mjlab built-in</td><td>Do not fall over (tilt above 70° ends the episode).</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="mimic">
+  <h2>Path 2 · Teaching a dance (motion imitation)</h2>
+  <div class="prose">
+    <p>Imitation needs a reference: a recording of what the robot should do. The repo ships one, <code>src/assets/motions/g1/dance1_subject2.csv</code>: 3,945 rows at 30 frames per second. Each row holds the root position (x, y, z), the root orientation as a quaternion, and 29 joint angles. A human dance was already retargeted onto the G1's skeleton before it reached this file.</p>
+    <p><strong>Preparing the reference.</strong> The CSV only contains joint angles, but the rewards compare the positions and velocities of 14 body parts (hands, feet, knees, torso…). <code>scripts/csv_to_npz.py</code> computes them. Its <code>MotionLoader</code> resamples the clip from 30 to 50 fps (linear interpolation for positions, SLERP for the rotation) and estimates velocities by finite differences. <code>run_sim()</code> then places a single simulated G1 in each pose in turn, without running physics, and calls <code>sim.forward()</code> so MuJoCo computes forward kinematics: the world pose and velocity of every body. The results are stacked into arrays and saved as an <code>.npz</code>.</p>
+  </div>
+  <pre class="cmd">python scripts/csv_to_npz.py --robot g1 --input-file src/assets/motions/g1/dance1_subject2.csv \
+       --output-name dance1_subject2.npz --input-fps 30 --output-fps 50
+python scripts/train.py Unitree-G1-Tracking-No-State-Estimation \
+       --motion_file=src/assets/motions/g1/dance1_subject2.npz --env.scene.num-envs=4096</pre>
+  <div class="prose">
+    <p>The <code>.npz</code> is a dictionary of arrays (T = frames, J = joints, B = bodies):</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Key</th><th>Shape</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">fps</td><td class="num">(1,)</td><td>Frame rate of the file (50).</td></tr>
+        <tr><td class="fn">joint_pos</td><td class="num">(T, J)</td><td>Joint angles in radians.</td></tr>
+        <tr><td class="fn">joint_vel</td><td class="num">(T, J)</td><td>Joint angular velocities.</td></tr>
+        <tr><td class="fn">body_pos_w</td><td class="num">(T, B, 3)</td><td>World position of every body link.</td></tr>
+        <tr><td class="fn">body_quat_w</td><td class="num">(T, B, 4)</td><td>World orientation of every link, quaternion w-x-y-z.</td></tr>
+        <tr><td class="fn">body_lin_vel_w</td><td class="num">(T, B, 3)</td><td>World linear velocity of every link.</td></tr>
+        <tr><td class="fn">body_ang_vel_w</td><td class="num">(T, B, 3)</td><td>World angular velocity of every link.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prose">
+    <p><strong>Training.</strong> <code>train.py</code> notices that the task has a <code>"motion"</code> command and copies the <code>--motion_file</code> path into it. The <code>MotionCommand</code> term then works like a video player with one playhead per simulated robot. Each step it advances the playhead by one frame and exposes the reference pose at that frame. The policy observes the reference joint angles and velocities plus the orientation of the reference torso relative to its own. The rewards compare reference and robot: torso position and orientation, the 14 body positions and orientations, and their velocities, each as <code>exp(-error²/std²)</code>.</p>
+    <p>Two ideas make this work. <strong>Reference state initialisation</strong>: when a robot is reset, it is teleported onto the reference at some frame (with small random noise), so it does not have to learn the first second of the dance before it can practise the tenth. <strong>Adaptive sampling</strong>: the clip is cut into one-second bins and the code counts in which bins robots fall. New episodes start more often in the bins that cause failures, so practice concentrates on the hard moves.</p>
+    <p>Body positions are compared after re-centring the reference on the robot (<code>body_pos_relative_w</code>): the reference is shifted and turned so that its torso has the robot's horizontal position and heading. This keeps the robot from being punished for drifting a few centimetres across the floor while it dances correctly.</p>
+  </div>
+  <figure class="diagram">
+<script type="text/x-mermaid">
+flowchart LR
+  CSV["dance1_subject2.csv<br/>30 fps · root pose + 29 joints"]:::data --> ML["MotionLoader<br/>resample to 50 fps<br/>finite-difference velocities"]:::py
+  ML --> RS["run_sim()<br/>write pose → sim.forward()<br/>record every body"]:::py
+  RS --> NPZ["dance1_subject2.npz"]:::data
+  NPZ --> MC["MotionCommand<br/>one playhead per robot"]:::py
+  MC --> OBS["observations<br/>reference joints, anchor orientation"]:::py
+  MC --> REW["rewards<br/>exp(-error²/std²)"]:::py
+  MC --> TERM["terminations<br/>torso or hands/feet too far off"]:::py
+  TERM -->|"which second failed"| AS["adaptive sampling<br/>of start frames"]:::py
+  AS -->|"reset at a hard frame"| MC
+  classDef py stroke:@py,stroke-width:2px
+  classDef data stroke:@data,stroke-width:2px,stroke-dasharray:4 3
+</script>
+    <figcaption>Data flow of motion imitation, from the CSV file to the feedback loop that chooses where the next practice episode starts.</figcaption>
+  </figure>
+  <div class="prose">
+    <p>There are two variants of the G1 task. <code>Unitree-G1-Tracking</code> lets the actor see the torso's position error and the body's linear velocity. A real robot cannot measure either reliably without a separate state estimator, so <code>Unitree-G1-Tracking-No-State-Estimation</code> removes them; that is the one meant for deployment. When saving, <code>MotionTrackingOnPolicyRunner</code> exports both a plain <code>policy.onnx</code> and a second ONNX file that embeds the whole reference motion.</p>
+  </div>
+</section>
+
+<section id="play" class="prose">
+  <h2>Checking the result: play.py</h2>
+  <pre class="cmd">python scripts/play.py Unitree-G1-Flat --checkpoint-file=logs/rsl_rl/g1_velocity/&lt;run&gt;/model_10000.pt</pre>
+  <p><code>run_play()</code> loads the <em>play</em> version of the environment config, created by the same <code>env_cfgs.py</code> function with <code>play=True</code>: episodes never time out, sensor noise and random pushes are off, the curriculum is off, and on rough terrain a 5×5 grid of random terrain is used. It builds the runner, loads only the actor weights from the checkpoint, and asks for an inference policy. Then it hands the environment and the policy to a viewer: the native MuJoCo window when a display is available, otherwise the browser-based Viser viewer.</p>
+  <p>In the viewer you see the robot plus debugging drawings produced by the code. For velocity tasks, <code>UniformVelocityCommand._debug_vis_impl</code> draws arrows above the robot: blue and green for the command, cyan and light green for the actual velocity. In Viser, <code>create_gui()</code> adds sliders so you can drive the robot yourself. For tracking tasks, <code>MotionCommand._debug_vis_impl</code> draws a translucent green "ghost" robot in the reference pose next to the real one.</p>
+  <p>You can also run <code>--agent zero</code> or <code>--agent random</code> to see the environment without any trained network, and <code>--video</code> to save an MP4 to <code>&lt;run&gt;/videos/play/</code>.</p>
+</section>
+
+<section id="deploy">
+  <h2>Path 3 · From simulation to the real robot</h2>
+  <div class="prose">
+    <p>The robot's on-board computer does not run Python or PyTorch. The <code>deploy/</code> folder contains a small C++ program per robot (for example <code>deploy/robots/g1</code> → executable <code>g1_ctrl</code>) that loads <code>policy.onnx</code> with ONNX Runtime and re-implements just enough of mjlab to compute the same observations the network saw in training.</p>
+    <p><strong>Start-up.</strong> <code>main()</code> reads <code>config/config.yaml</code>, connects to Unitree's DDS network on the interface you name (<code>--network=lo</code> for simulation, the Ethernet interface for the real robot), waits for the first <code>LowState</code> message (IMU, motor angles, joystick), checks the robot model, and starts a finite state machine.</p>
+    <p><strong>The state machine.</strong> A robot must never jump from lying limp to running a neural network. <code>CtrlFSM</code> moves through safe states, switched by gamepad button combinations written in <code>config.yaml</code> and parsed by a small expression language (<code>unitree_joystick_dsl.hpp</code>).</p>
+  </div>
+  <figure class="diagram">
+<script type="text/x-mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --> Passive
+  Passive --> FixStand: LT + up
+  FixStand --> Passive: LT + B
+  FixStand --> Velocity: RT + A
+  Velocity --> Passive: LT + B
+  Velocity --> Mimic: RB + A
+  Mimic --> Velocity: RT + A, or clip finished
+  Mimic --> Passive: LT + B
+  note right of Passive
+    damping only (kp = 0)
+    any state returns here
+    if LowState times out
+  end note
+</script>
+    <figcaption>States and transitions from <code>deploy/robots/g1/config/config.yaml</code>. Velocity is a <code>State_RLBase</code>; Mimic is <code>State_Mimic</code> playing <code>dance1_subject2</code>.</figcaption>
+  </figure>
+  <div class="prose">
+    <ul>
+      <li><strong>Passive</strong> (<code>State_Passive</code>): motors only apply damping, so the robot can be handled safely.</li>
+      <li><strong>FixStand</strong> (<code>State_FixStand</code>): every joint moves in a straight line over 2 seconds from where it is to the standing pose, using <code>linear_interpolate()</code>.</li>
+      <li><strong>Velocity</strong> (<code>State_RLBase</code>): runs the walking policy. The left stick sets forward/sideways speed, the right stick sets turn rate.</li>
+      <li><strong>Mimic</strong> (<code>State_Mimic</code>): runs the dance policy while a C++ <code>MotionLoader_</code> plays the <code>.npz</code> reference in time. When the clip ends it returns to Velocity.</li>
+    </ul>
+    <p><strong>Two loops at two speeds.</strong> Inside the RL states, a policy thread runs at 50 Hz exactly like the simulator. It reads sensors, builds the observation, runs the network, and turns the output into target angles. The FSM thread runs at 1 kHz and copies the latest targets into the motor command. The motor drivers then apply <code>τ = kp·(q* − q) + kd·(dq* − dq)</code> with the same gains used in training.</p>
+  </div>
+  <figure class="diagram">
+<script type="text/x-mermaid">
+flowchart TB
+  subgraph POL["policy thread · 50 Hz · ManagerBasedRLEnv::step()"]
+    direction LR
+    U["robot.update()<br/>IMU + motors from LowState"]:::cpp --> O["ObservationManager.compute()<br/>same terms as training"]:::cpp
+    O --> ACT["OrtRunner.act()<br/>policy.onnx"]:::cpp
+    ACT --> PA["ActionManager<br/>a · scale + offset"]:::cpp
+  end
+  subgraph FSM["FSM thread · 1 kHz · CtrlFSM::run_()"]
+    direction LR
+    PRE["pre_run()<br/>read joystick"]:::cpp --> RUN["run()<br/>copy target q to LowCmd"]:::cpp
+    RUN --> POST["post_run()<br/>publish LowCmd"]:::cpp
+    POST --> CHK["check transitions"]:::cpp
+  end
+  PA -.->|"processed_actions()"| RUN
+  POST -->|"DDS rt/lowcmd"| DRV["motor drivers or simulate/ bridge<br/>τ = kp(q*−q) + kd(dq*−dq)"]:::cpp
+  DRV -->|"DDS rt/lowstate"| U
+  classDef cpp stroke:@cpp,stroke-width:2px
+</script>
+    <figcaption>The two threads of a running RL state. The dotted arrow is shared memory, the solid arrows are DDS messages.</figcaption>
+  </figure>
+  <div class="prose">
+    <p><strong>Sim-to-sim first.</strong> Before risking hardware, you build <code>simulate/</code> into <code>unitree_mujoco</code>. It loads the robot scene named in <code>simulate/config.yaml</code>, runs MuJoCo, and a bridge thread (<code>RobotBridge::run()</code>, 1 kHz) pretends to be the robot: it converts incoming <code>LowCmd</code> messages into motor torques with the PD formula and publishes the simulated sensors as <code>LowState</code>. Because <code>g1_ctrl</code> cannot tell the difference, the very same binary later runs on the real robot by changing <code>--network</code>.</p>
+  </div>
+
+  <h3 id="contract">How Python and C++ agree</h3>
+  <div class="prose">
+    <p>The network only works if the robot feeds it numbers in exactly the order, scale and units it saw during training. That contract lives in <code>deploy/robots/&lt;robot&gt;/config/policy/&lt;task&gt;/params/deploy.yaml</code>: the policy step time, joint order, PD gains, default pose, action scale and offset, and the list of observation terms. The table pairs the G1 velocity task's training terms with their C++ counterparts.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Training term (Python)</th><th>deploy.yaml term (C++)</th><th>Size</th><th>Source on the robot</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">base_ang_vel</td><td class="fn">base_ang_vel</td><td class="num">3</td><td>IMU gyroscope</td></tr>
+        <tr><td class="fn">projected_gravity</td><td class="fn">projected_gravity</td><td class="num">3</td><td>IMU quaternion, rotated gravity vector</td></tr>
+        <tr><td class="fn">command</td><td class="fn">velocity_commands</td><td class="num">3</td><td>Gamepad sticks, clamped to the command ranges</td></tr>
+        <tr><td class="fn">phase</td><td class="fn">gait_phase</td><td class="num">2</td><td>Internal 0.6 s clock, zero when the command is near zero</td></tr>
+        <tr><td class="fn">joint_pos</td><td class="fn">joint_pos_rel</td><td class="num">29</td><td>Motor encoders minus default pose</td></tr>
+        <tr><td class="fn">joint_vel</td><td class="fn">joint_vel_rel</td><td class="num">29</td><td>Motor velocities</td></tr>
+        <tr><td class="fn">actions</td><td class="fn">last_action</td><td class="num">29</td><td>Previous network output</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prose">
+    <p>The rough-terrain policy also needs <code>height_scan</code>, which the C++ side does not provide, so the flat-terrain policy is the one to deploy. The PD gains in <code>deploy.yaml</code> (for example 40.2 and 99.1 N·m/rad for the hip joints) are the same numbers <code>g1_constants.py</code> computes from rotor inertia, and the action <code>offset</code> equals the default pose, mirroring <code>use_default_offset=True</code> in training.</p>
+  </div>
+</section>
+
+<section id="pictures">
+  <h2>Pictures and what they tell you</h2>
+  <div class="prose">
+    <p>The repository has no notebooks and no plotting code. Its images are the eight animated GIFs in <code>doc/gif/</code>, shown in the README. They come in pairs: one recorded in simulation and one on the physical robot. No script in the repo writes GIF files directly. The simulation clips are recordings of <code>scripts/play.py</code> with a trained checkpoint (adding <code>--video</code> makes <code>VideoRecorder</code> save an MP4 under <code>logs/rsl_rl/&lt;experiment&gt;/&lt;run&gt;/videos/play/</code>, which can be converted to GIF). The real clips were filmed while the robot ran the C++ controller from <code>deploy/robots/&lt;robot&gt;</code>.</p>
+    <p>Read each pair as one experiment. The left image answers <em>"did training produce the behaviour we wanted?"</em> The right image answers <em>"does that behaviour survive the jump to real hardware?"</em> Differences between them are the sim-to-real gap that the domain randomisation in the training config is meant to close.</p>
+  </div>
+  <div class="gallery">
+    <div class="gal-row">
+      <figure><img src="doc/gif/go2-velocity.gif" alt="Go2 quadruped trotting in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/go2-velocity.gif</code> · simulation</figcaption></figure>
+      <figure><img src="doc/gif/go2-velocity-real.gif" alt="Real Go2 quadruped walking" loading="lazy"><figcaption><code>doc/gif/go2-velocity-real.gif</code> · real robot</figcaption></figure>
+      <div class="gal-text">
+        <h4>Go2 velocity tracking</h4>
+        <p><span class="qa">Made by:</span> <code>play.py Unitree-Go2-Flat</code> (sim) and <code>deploy/robots/go2</code> (real).</p>
+        <p><span class="qa">Question it answers:</span> does the quadruped trot in response to velocity commands? The diagonal legs moving together show that the <code>feet_gait</code> reward with offsets [0, 0.5, 0.5, 0] produced a trot.</p>
+      </div>
+    </div>
+    <div class="gal-row">
+      <figure><img src="doc/gif/g1-velocity.gif" alt="G1 humanoid walking in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/g1-velocity.gif</code> · simulation</figcaption></figure>
+      <figure><img src="doc/gif/g1-velocity-real.gif" alt="Real G1 humanoid walking" loading="lazy"><figcaption><code>doc/gif/g1-velocity-real.gif</code> · real robot</figcaption></figure>
+      <div class="gal-text">
+        <h4>G1 velocity tracking</h4>
+        <p><span class="qa">Made by:</span> <code>play.py Unitree-G1-Flat</code> (sim) and <code>g1_ctrl</code> in the Velocity state (real).</p>
+        <p><span class="qa">Question it answers:</span> can a 29-joint humanoid walk stably on command with natural arm swing? Upright torso, alternating steps and swinging arms reflect the orientation, gait and angular-momentum terms.</p>
+      </div>
+    </div>
+    <div class="gal-row">
+      <figure><img src="doc/gif/h1_2-velocity.gif" alt="H1_2 humanoid walking in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/h1_2-velocity.gif</code> · simulation</figcaption></figure>
+      <figure><img src="doc/gif/h1_2-velocity-real.gif" alt="Real H1_2 humanoid walking" loading="lazy"><figcaption><code>doc/gif/h1_2-velocity-real.gif</code> · real robot</figcaption></figure>
+      <div class="gal-text">
+        <h4>H1_2 velocity tracking</h4>
+        <p><span class="qa">Made by:</span> <code>play.py Unitree-H1_2-Flat</code> and <code>deploy/robots/h1_2</code>.</p>
+        <p><span class="qa">Question it answers:</span> does the same velocity template transfer to a larger, heavier humanoid with only robot-specific names and gains changed? It shows that <code>make_velocity_env_cfg()</code> is reusable across robots.</p>
+      </div>
+    </div>
+    <div class="gal-row">
+      <figure><img src="doc/gif/g1-mimic.gif" alt="G1 humanoid dancing in simulation" loading="lazy"><figcaption><code>doc/gif/g1-mimic.gif</code> · simulation</figcaption></figure>
+      <figure><img src="doc/gif/g1-mimic-real.gif" alt="Real G1 humanoid dancing" loading="lazy"><figcaption><code>doc/gif/g1-mimic-real.gif</code> · real robot</figcaption></figure>
+      <div class="gal-text">
+        <h4>G1 motion imitation (dance)</h4>
+        <p><span class="qa">Made by:</span> <code>play.py Unitree-G1-Tracking-No-State-Estimation --motion_file=…dance1_subject2.npz</code> (sim) and <code>g1_ctrl</code> in the Mimic state (real).</p>
+        <p><span class="qa">Question it answers:</span> can the robot reproduce a whole-body human dance while keeping its balance? In the simulator the green ghost from <code>MotionCommand</code> shows the reference, so any gap between ghost and robot is tracking error.</p>
+      </div>
+    </div>
+  </div>
+  <div class="prose">
+    <h3>Visuals the code draws at run time</h3>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Visual</th><th>Produced by</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Velocity arrows above the robot</td><td class="fn">UniformVelocityCommand._debug_vis_impl</td><td>Compare commanded and actual velocity at a glance. When blue and cyan arrows overlap, the policy is tracking well.</td></tr>
+        <tr><td>Green ghost robot</td><td class="fn">MotionCommand._debug_vis_impl</td><td>Show the reference pose of the dance so tracking error is visible.</td></tr>
+        <tr><td>Height-scan rays and normals</td><td class="fn">terrain_scan sensor (debug_vis)</td><td>Show which ground points the rough-terrain policy perceives.</td></tr>
+        <tr><td>Terrain grid in the browser</td><td class="fn">scripts/visualize_terrain.py</td><td>Inspect the procedural terrains and how difficulty grows row by row before training on them.</td></tr>
+        <tr><td>Training / play videos (MP4)</td><td class="fn">VideoRecorder in train.py / play.py</td><td>Record progress during training (<code>--video</code>) or a final demo.</td></tr>
+        <tr><td>Optional motion video frames</td><td class="fn">csv_to_npz.py --render</td><td>Render the reference motion offscreen to check the conversion. Frames are collected in memory but not saved by the script.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="reference">
+  <h2>File &amp; function reference</h2>
+  <div class="prose">
+    <p>Each table lists a file's functions with their inputs and outputs, what they do, and what they connect to. Shapes use <code>B</code> for the number of parallel robots, <code>J</code> for joints, <code>K</code> for tracked bodies and <code>T</code> for frames. The same explanations are now written as comments inside the source files.</p>
+  </div>
+
+  <h3 id="ref-scripts" class="group-title">scripts/ <span class="pill py">entry points</span></h3>
+
+  <div class="filecard">
+    <div class="fhead"><h4>scripts/train.py</h4><span class="pill py">Python</span></div>
+    <p>Starts a training run. The first argument is the task id; everything else overrides the config.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">main()</td><td>sys.argv → None</td><td>Imports <code>src.tasks</code> so all tasks register, lets tyro parse the task id and flags into a <code>TrainConfig</code>.</td><td>calls TrainConfig.from_task, launch_training</td></tr>
+        <tr><td class="fn">TrainConfig</td><td>dataclass</td><td>Holds <code>env</code> (ManagerBasedRlEnvCfg), <code>agent</code> (PPO runner cfg), <code>motion_file</code>, video flags, NaN guard, <code>gpu_ids</code>.</td><td>filled from registry; read by run_train</td></tr>
+        <tr><td class="fn">TrainConfig.from_task(task_id)</td><td>str → TrainConfig</td><td>Loads the registered env and RL configs.</td><td>mjlab load_env_cfg / load_rl_cfg</td></tr>
+        <tr><td class="fn">launch_training(task_id, args)</td><td>str, TrainConfig → None</td><td>Builds <code>logs/rsl_rl/&lt;experiment&gt;/&lt;timestamp&gt;</code>, selects GPUs, starts one worker or several via torchrunx.</td><td>calls run_train</td></tr>
+        <tr><td class="fn">run_train(task_id, cfg, log_dir)</td><td>str, TrainConfig, Path → None (files in log_dir)</td><td>Chooses device and seed, injects the motion file for tracking tasks, builds env and wrappers, creates the runner, dumps <code>params/env.yaml</code> and <code>agent.yaml</code>, runs <code>learn()</code>.</td><td>ManagerBasedRlEnv, RslRlVecEnvWrapper, VelocityOnPolicyRunner / MotionTrackingOnPolicyRunner</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>scripts/play.py</h4><span class="pill py">Python</span></div>
+    <p>Runs a trained or dummy policy in an interactive viewer.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">PlayConfig</td><td>dataclass</td><td><code>agent</code> (trained / zero / random), <code>checkpoint_file</code>, <code>motion_file</code>, <code>num_envs</code>, <code>device</code>, video options, <code>viewer</code>, <code>no_terminations</code>.</td><td>parsed by main</td></tr>
+        <tr><td class="fn">run_play(task_id, cfg)</td><td>str, PlayConfig → None (blocks)</td><td>Loads the play env config, loads actor weights or builds a dummy policy, opens NativeMujocoViewer or ViserPlayViewer which loops obs → policy → step.</td><td>load_env_cfg(play=True), runner.get_inference_policy, viewers</td></tr>
+        <tr><td class="fn">main()</td><td>sys.argv → None</td><td>Parses <code>&lt;TASK_ID&gt; [flags]</code>.</td><td>calls run_play</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>scripts/csv_to_npz.py</h4><span class="pill py">Python</span><span class="pill data">writes .npz</span></div>
+    <p>Turns a joint-angle CSV into the full-body reference used by tracking tasks.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">MotionLoader.__init__</td><td>csv path, input_fps, output_fps, device, line_range → object</td><td>Runs load, interpolate, velocities in order.</td><td>used by run_sim</td></tr>
+        <tr><td class="fn">_load_motion()</td><td>CSV → tensors (N,3), (N,4), (N,D)</td><td>Reads root position, root quaternion (reordered xyzw → wxyz), joint angles.</td><td>numpy.loadtxt</td></tr>
+        <tr><td class="fn">_interpolate_motion()</td><td>input tensors → (T_out, …) tensors</td><td>Resamples to the output frame rate: lerp for positions, slerp for rotation.</td><td>_compute_frame_blend, _lerp, _slerp</td></tr>
+        <tr><td class="fn">_compute_frame_blend(times)</td><td>(T_out,) → index_0, index_1, blend</td><td>Finds neighbouring input frames and the blend factor for each output time.</td><td>—</td></tr>
+        <tr><td class="fn">_lerp / _slerp</td><td>a, b, blend → interpolated</td><td>Linear and spherical-linear interpolation.</td><td>mjlab quat_slerp</td></tr>
+        <tr><td class="fn">_compute_velocities()</td><td>positions/rotations → velocities (T,3), (T,D)</td><td>Central finite differences; angular velocity via <code>_so3_derivative</code>.</td><td>torch.gradient</td></tr>
+        <tr><td class="fn">_so3_derivative(rot, dt)</td><td>(T,4), float → (T,3)</td><td>Angular velocity from <code>q[t+1]·q[t-1]⁻¹</code> converted to axis-angle over 2·dt.</td><td>quat_mul, axis_angle_from_quat</td></tr>
+        <tr><td class="fn">get_next_state()</td><td>— → (6 tensors of shape (1,·)), reset_flag</td><td>Returns the next frame; flag is True after the last frame.</td><td>called by run_sim</td></tr>
+        <tr><td class="fn">run_sim(sim, scene, joint_names, …)</td><td>simulation + paths → None (writes .npz)</td><td>For each frame writes root and joint state, calls <code>sim.forward()</code>, records all body poses/velocities, saves on wrap-around.</td><td>MotionLoader, Entity.write_*_to_sim, np.savez</td></tr>
+        <tr><td class="fn">main(robot, input_file, output_name, …)</td><td>CLI args → None</td><td>Picks the G1 29- or 23-DoF scene and joint order, builds a 1-robot simulation, optional renderer, calls run_sim.</td><td>tracking env cfgs, Simulation, run_sim</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>scripts/list_envs.py · scripts/visualize_terrain.py</h4><span class="pill py">Python</span></div>
+    <p>Two helper tools: one prints registered task ids, the other is a browser terrain inspector.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">list_environments(keyword)</td><td>str | None → int</td><td>Prints a table of task ids, optionally filtered.</td><td>mjlab list_tasks</td></tr>
+        <tr><td class="fn">visualize_terrain.main()</td><td>— → runs forever</td><td>Starts a Viser server with GUI for preset, seed, robot and terrain parameters.</td><td>update_terrain, update_robots, rebuild_gui</td></tr>
+        <tr><td class="fn">update_terrain()</td><td>GUI state → None</td><td>Generates the terrain grid with <code>TerrainGenerator</code>, merges geoms to one mesh, uploads it.</td><td>mjlab terrains, update_robots</td></tr>
+        <tr><td class="fn">update_robots()</td><td>GUI state → None</td><td>Places one robot mesh on every terrain tile origin.</td><td>robot cfg getters</td></tr>
+        <tr><td class="fn">rebuild_gui()</td><td>preset → None</td><td>Creates sliders and checkboxes for the selected terrain's dataclass fields.</td><td>update_terrain on change</td></tr>
+        <tr><td class="fn">_AppState</td><td>TypedDict</td><td>preset_name, robot_name, seed, size, params, rows, cols, difficulty_range, robot_handles, terrain_origins (rows, cols, 3).</td><td>shared by callbacks</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <h3 id="ref-velocity" class="group-title">src/tasks/velocity <span class="pill py">walking task</span></h3>
+
+  <div class="filecard">
+    <div class="fhead"><h4>velocity_env_cfg.py</h4><span class="pill py">Python</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">make_velocity_env_cfg()</td><td>— → ManagerBasedRlEnvCfg</td><td>Robot-independent template: height-scan sensor, actor/critic observations, joint-position action, twist command, events, rewards, terminations, curricula, rough terrain, 200 Hz physics with decimation 4, 20 s episodes.</td><td>called by every config/ROBOT/env_cfgs.py; uses functions from mdp/</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>config/&lt;robot&gt;/__init__.py · env_cfgs.py · rl_cfg.py</h4><span class="pill py">Python</span></div>
+    <p>Eight robot folders (a2, as2, g1, g1_23dof, go2, h1_2, h2, r1) with the same three files. G1 and Go2 are the representative templates.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">__init__.py</td><td>module import → registry entries</td><td>Calls <code>register_mjlab_task</code> for <code>Unitree-&lt;Robot&gt;-Rough</code> and <code>-Flat</code>.</td><td>read by train.py / play.py</td></tr>
+        <tr><td class="fn">unitree_&lt;robot&gt;_rough_env_cfg(play)</td><td>bool → ManagerBasedRlEnvCfg</td><td>Fills the template with the robot asset, contact sensors, foot sites/geoms, action scale, per-joint pose tolerance; play mode removes noise, pushes and curriculum.</td><td>make_velocity_env_cfg, get_&lt;robot&gt;_robot_cfg</td></tr>
+        <tr><td class="fn">unitree_&lt;robot&gt;_flat_env_cfg(play)</td><td>bool → ManagerBasedRlEnvCfg</td><td>Rough config with a flat plane, no height scan, no terrain curriculum.</td><td>rough_env_cfg</td></tr>
+        <tr><td class="fn">unitree_&lt;robot&gt;_ppo_runner_cfg()</td><td>— → RslRlOnPolicyRunnerCfg</td><td>Actor and critic MLP 512-256-128 (ELU), PPO hyper-parameters, 24 steps per env per iteration, experiment name, save interval 100, 10,001 iterations.</td><td>registered as rl_cfg</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>mdp/velocity_command.py</h4><span class="pill py">Python</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">UniformVelocityCommand.command</td><td>— → (B, 3)</td><td>Current <code>[vx, vy, wz]</code> in the base frame.</td><td>observations "command", rewards</td></tr>
+        <tr><td class="fn">_resample_command(env_ids)</td><td>(K,) → None</td><td>Draws new random commands; zeroes tiny ones; picks heading and standing envs; may set initial root velocity.</td><td>called by CommandManager on timer / reset</td></tr>
+        <tr><td class="fn">_update_command()</td><td>— → None</td><td>Heading envs: turn rate from heading error. Standing envs: zero command.</td><td>every step</td></tr>
+        <tr><td class="fn">_update_metrics()</td><td>— → None</td><td>Accumulates xy and yaw tracking errors for logging.</td><td>logged by runner</td></tr>
+        <tr><td class="fn">create_gui / compute</td><td>viser server → None</td><td>Joystick sliders in Viser that override the watched robot's command.</td><td>ViserPlayViewer</td></tr>
+        <tr><td class="fn">_debug_vis_impl(visualizer)</td><td>→ None</td><td>Draws command and actual velocity arrows.</td><td>viewers</td></tr>
+        <tr><td class="fn">UniformVelocityCommandCfg</td><td>dataclass</td><td>entity_name, heading settings, standing fraction, <code>Ranges(lin_vel_x, lin_vel_y, ang_vel_z, heading)</code>, viz.</td><td>build() → UniformVelocityCommand</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>mdp/rewards.py · observations.py · terminations.py · curriculums.py</h4><span class="pill py">Python</span></div>
+    <p>Every function takes <code>env</code> plus keyword parameters from the config and returns a tensor with one value per robot.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">track_linear_velocity</td><td>std, command_name → (B,)</td><td><code>exp(-(|cmd_xy−v_xy|² + 2v_z²)/std²)</code></td><td>RewardManager; UniformVelocityCommand</td></tr>
+        <tr><td class="fn">track_angular_velocity</td><td>std, command_name → (B,)</td><td><code>exp(-((cmd_wz−w_z)² + 0.05|w_xy|²)/std²)</code></td><td>RewardManager</td></tr>
+        <tr><td class="fn">body_orientation_l2</td><td>asset_cfg → (B,)</td><td>Squared xy components of gravity in the body frame (tilt).</td><td>RewardManager</td></tr>
+        <tr><td class="fn">self_collision_cost</td><td>sensor_name, force_threshold → (B,)</td><td>Number of sub-steps with a self-contact above the force threshold.</td><td>self_collision ContactSensor</td></tr>
+        <tr><td class="fn">body_angular_velocity_penalty</td><td>asset_cfg → (B,)</td><td>Roll and pitch rate squared of one body.</td><td>RewardManager</td></tr>
+        <tr><td class="fn">angular_momentum_penalty</td><td>sensor_name → (B,)</td><td>Squared whole-body angular momentum; logs its mean.</td><td>root_angmom sensor</td></tr>
+        <tr><td class="fn">feet_air_time</td><td>sensor, threshold → (B,)</td><td>Rewards single-stance phases near the target duration (unused by default).</td><td>feet ContactSensor</td></tr>
+        <tr><td class="fn">feet_clearance</td><td>target_height → (B,)</td><td>Σ |foot_z − target| × foot speed, only when moving.</td><td>foot sites</td></tr>
+        <tr><td class="fn">feet_gait</td><td>period, offset, threshold → (B,)</td><td>Fraction of feet whose contact matches the gait clock.</td><td>feet ContactSensor; matches obs <code>phase</code></td></tr>
+        <tr><td class="fn">feet_swing_height</td><td>class, stateful → (B,)</td><td>Penalises peak swing height error at touchdown (unused by default).</td><td>feet ContactSensor</td></tr>
+        <tr><td class="fn">feet_slip</td><td>sensor, command → (B,)</td><td>Squared foot speed while in contact.</td><td>feet ContactSensor</td></tr>
+        <tr><td class="fn">soft_landing</td><td>sensor, command → (B,)</td><td>Contact force of feet that just touched down.</td><td>feet ContactSensor</td></tr>
+        <tr><td class="fn">variable_posture</td><td>class; std dicts → (B,)</td><td><code>exp(-mean((q−q₀)²/std²))</code> with std chosen by speed regime.</td><td>RewardManager</td></tr>
+        <tr><td class="fn">stand_still</td><td>command_threshold → (B,)</td><td>Σ(q−q₀)² only when the command is near zero.</td><td>RewardManager</td></tr>
+        <tr><td class="fn">foot_height / foot_air_time / foot_contact</td><td>→ (B, n_feet)</td><td>Critic-only foot observations.</td><td>ObservationManager (critic)</td></tr>
+        <tr><td class="fn">foot_contact_forces</td><td>→ (B, n_feet·3)</td><td>Log-compressed contact force vectors (critic).</td><td>ObservationManager (critic)</td></tr>
+        <tr><td class="fn">phase</td><td>period, command_name → (B, 2)</td><td>sin/cos gait clock, zero when standing.</td><td>actor obs; C++ <code>gait_phase</code></td></tr>
+        <tr><td class="fn">illegal_contact</td><td>sensor_name → (B,) bool</td><td>True if a non-foot body touches the ground (quadrupeds).</td><td>TerminationManager</td></tr>
+        <tr><td class="fn">terrain_levels_vel</td><td>env_ids, command_name → scalar</td><td>Moves robots up or down terrain difficulty rows based on distance walked.</td><td>CurriculumManager; terrain</td></tr>
+        <tr><td class="fn">commands_vel</td><td>velocity_stages → {}</td><td>Widens command ranges after the given step counts.</td><td>CurriculumManager; command cfg</td></tr>
+        <tr><td class="fn">reward_weight</td><td>reward_name, weight_stages → (1,)</td><td>Changes a reward weight by stage (unused by default).</td><td>CurriculumManager</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>rl/runner.py</h4><span class="pill py">Python</span><span class="pill data">writes policy.onnx</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">VelocityOnPolicyRunner.save(path, infos)</td><td>".../model_N.pt" → None</td><td>Saves the checkpoint, exports the actor to <code>policy.onnx</code>, attaches metadata, uploads to W&amp;B if enabled.</td><td>MjlabOnPolicyRunner.save; deploy/ consumes policy.onnx</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <h3 id="ref-tracking" class="group-title">src/tasks/tracking <span class="pill py">imitation task</span></h3>
+
+  <div class="filecard">
+    <div class="fhead"><h4>tracking_env_cfg.py · config/g1/env_cfgs.py · config/g1/__init__.py</h4><span class="pill py">Python</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">make_tracking_env_cfg()</td><td>— → ManagerBasedRlEnvCfg</td><td>Template: motion command, actor/critic observations, six <code>exp</code> tracking rewards plus penalties, four terminations, flat plane, 10 s episodes.</td><td>uses mdp/ functions; called by robot env cfg</td></tr>
+        <tr><td class="fn">unitree_g1_flat_tracking_env_cfg(has_state_estimation, play)</td><td>bool, bool → ManagerBasedRlEnvCfg</td><td>Sets robot, anchor <code>torso_link</code>, 14 tracked bodies, end-effector terminations; can drop non-measurable observations; play mode starts at frame 0.</td><td>make_tracking_env_cfg</td></tr>
+        <tr><td class="fn">__init__.py</td><td>import → registry</td><td>Registers <code>Unitree-G1-Tracking</code> and <code>Unitree-G1-Tracking-No-State-Estimation</code> (same pattern for g1_23dof).</td><td>train.py, play.py</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>mdp/commands.py</h4><span class="pill py">Python</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">MotionLoader(file, body_indexes)</td><td>.npz → tensors on GPU</td><td>joint_pos (T,J), joint_vel, body_pos_w (T,K,3), body_quat_w, body_lin_vel_w, body_ang_vel_w.</td><td>reads csv_to_npz output</td></tr>
+        <tr><td class="fn">MotionCommand.command</td><td>— → (B, 2J)</td><td>Reference joint positions and velocities at each robot's frame.</td><td>actor observation "command"</td></tr>
+        <tr><td class="fn">xxx / robot_xxx properties</td><td>— → (B, …)</td><td>Reference vs actual anchor and body poses/velocities.</td><td>rewards, terminations, observations</td></tr>
+        <tr><td class="fn">_resample_command(env_ids)</td><td>(K,) → None</td><td>Picks start frames and teleports robots onto the reference with small noise (reference state initialisation).</td><td>_adaptive_sampling / _uniform_sampling</td></tr>
+        <tr><td class="fn">_adaptive_sampling(env_ids)</td><td>(K,) → None</td><td>Samples start frames weighted by per-second failure rates.</td><td>TerminationManager results</td></tr>
+        <tr><td class="fn">_update_command()</td><td>— → None</td><td>Advances playheads, resamples finished ones, recomputes <code>body_pos_relative_w</code> / <code>body_quat_relative_w</code>, updates failure statistics.</td><td>every step</td></tr>
+        <tr><td class="fn">_update_metrics()</td><td>— → None</td><td>Logs anchor, body and joint errors.</td><td>runner logs</td></tr>
+        <tr><td class="fn">_debug_vis_impl</td><td>→ None</td><td>Ghost robot or coordinate frames.</td><td>viewers</td></tr>
+        <tr><td class="fn">MotionCommandCfg</td><td>dataclass</td><td>motion_file, anchor_body_name, body_names, pose/velocity/joint noise ranges, adaptive parameters, sampling_mode, viz.</td><td>build() → MotionCommand</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>mdp/observations.py · rewards.py · terminations.py · metrics.py</h4><span class="pill py">Python</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">motion_anchor_pos_b</td><td>command_name → (B, 3)</td><td>Reference torso position in the robot torso frame.</td><td>actor (state-estimation variant), critic</td></tr>
+        <tr><td class="fn">motion_anchor_ori_b</td><td>command_name → (B, 6)</td><td>Relative torso rotation as two matrix columns.</td><td>actor, critic; C++ twin in State_Mimic.cpp</td></tr>
+        <tr><td class="fn">robot_body_pos_b / robot_body_ori_b</td><td>→ (B, K·3) / (B, K·6)</td><td>Robot body poses relative to its torso.</td><td>critic only</td></tr>
+        <tr><td class="fn">motion_global_anchor_position_error_exp</td><td>std → (B,)</td><td>Torso position tracking (weight 0.5, std 0.3).</td><td>RewardManager</td></tr>
+        <tr><td class="fn">motion_global_anchor_orientation_error_exp</td><td>std → (B,)</td><td>Torso orientation tracking (0.5, std 0.4).</td><td>RewardManager</td></tr>
+        <tr><td class="fn">motion_relative_body_position_error_exp</td><td>std, body_names → (B,)</td><td>Body positions vs re-centred reference (1.0, std 0.3).</td><td>RewardManager</td></tr>
+        <tr><td class="fn">motion_relative_body_orientation_error_exp</td><td>std → (B,)</td><td>Body orientations (1.0, std 0.4).</td><td>RewardManager</td></tr>
+        <tr><td class="fn">motion_global_body_linear/angular_velocity_error_exp</td><td>std → (B,)</td><td>Body velocities (1.0, std 1.0 and 3.14).</td><td>RewardManager</td></tr>
+        <tr><td class="fn">self_collision_cost</td><td>sensor_name → (B,)</td><td>Self-contact count (weight −10).</td><td>self_collision sensor</td></tr>
+        <tr><td class="fn">bad_anchor_pos(_z_only)</td><td>threshold → (B,) bool</td><td>Torso position (or height) error too large.</td><td>TerminationManager</td></tr>
+        <tr><td class="fn">bad_anchor_ori</td><td>threshold → (B,) bool</td><td>Torso tilt differs from the reference tilt.</td><td>TerminationManager</td></tr>
+        <tr><td class="fn">bad_motion_body_pos(_z_only)</td><td>threshold, body_names → (B,) bool</td><td>Any hand or foot too far (or too high/low) from the reference.</td><td>TerminationManager</td></tr>
+        <tr><td class="fn">compute_mpkpe, compute_root_relative_mpkpe, compute_joint_velocity_error, compute_ee_position_error, compute_ee_orientation_error</td><td>MotionCommand → (B,)</td><td>Evaluation metrics (mean per-keybody position error etc.). Not wired into any config yet.</td><td>for analysis</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>rl/runner.py</h4><span class="pill py">Python</span><span class="pill data">writes 2 × .onnx</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">_OnnxMotionModel.forward(x, time_step)</td><td>(1, obs), (1, 1) → actions + 6 reference tensors</td><td>Policy plus the reference motion frame, packaged into one ONNX graph.</td><td>export_motion_policy_to_onnx</td></tr>
+        <tr><td class="fn">export_motion_policy_to_onnx(path, filename)</td><td>dir, name → None</td><td>Exports _OnnxMotionModel with inputs "obs", "time_step".</td><td>torch.onnx.export</td></tr>
+        <tr><td class="fn">save(path, infos)</td><td>".../model_N.pt" → None</td><td>Writes the checkpoint, <code>&lt;run&gt;.onnx</code> (with anchor/body metadata) and plain <code>policy.onnx</code>.</td><td>deploy/robots/g1 Mimic uses policy.onnx</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <h3 id="ref-assets" class="group-title">src/assets <span class="pill py">robot models</span></h3>
+
+  <div class="filecard">
+    <div class="fhead"><h4>robots/unitree_&lt;robot&gt;/&lt;robot&gt;_constants.py · robots/__init__.py</h4><span class="pill py">Python</span></div>
+    <p>One file per robot, with the MJCF XML and meshes next to it. Motion CSVs live in <code>src/assets/motions/</code>.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">get_assets(meshdir)</td><td>str → dict[str, bytes]</td><td>Reads all mesh files into memory.</td><td>get_spec</td></tr>
+        <tr><td class="fn">get_spec()</td><td>— → mujoco.MjSpec</td><td>Parses the robot XML and attaches the meshes.</td><td>EntityCfg.spec_fn</td></tr>
+        <tr><td class="fn">G1_ACTUATOR_* / G1_ARTICULATION</td><td>constants</td><td>Motor groups with armature, stiffness, damping and torque limit (10 Hz natural frequency, damping ratio 2).</td><td>get_g1_robot_cfg</td></tr>
+        <tr><td class="fn">get_&lt;robot&gt;_robot_cfg()</td><td>— → EntityCfg</td><td>Bundles start pose, collision settings, MJCF and motors into one robot description.</td><td>velocity & tracking env cfgs</td></tr>
+        <tr><td class="fn">&lt;ROBOT&gt;_ACTION_SCALE</td><td>dict {joint regex: float}</td><td><code>0.25 × torque_limit / stiffness</code> per motor group.</td><td>JointPositionAction.scale</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <h3 id="ref-deploy" class="group-title">deploy/ <span class="pill cpp">robot controller</span></h3>
+
+  <div class="filecard">
+    <div class="fhead"><h4>robots/&lt;robot&gt;/main.cpp · include/param.h</h4><span class="pill cpp">C++</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">main(argc, argv)</td><td>--network → never returns</td><td>Loads config, initialises DDS, waits for the robot, checks robot type, starts the FSM.</td><td>param::helper, init_fsm_state, CtrlFSM</td></tr>
+        <tr><td class="fn">init_fsm_state()</td><td>— → None</td><td>Creates the LowCmd publisher and LowState subscriber; blocks until connected.</td><td>FSMState statics</td></tr>
+        <tr><td class="fn">param::helper(argc, argv)</td><td>CLI → options map</td><td>Finds the binary, loads <code>config/config.yaml</code>, parses flags, sets up logging.</td><td>load_config_file</td></tr>
+        <tr><td class="fn">param::parser_policy_dir(dir)</td><td>path → path</td><td>Resolves the folder with <code>exported/policy.onnx</code>, picking the newest sub-folder if needed.</td><td>State_RLBase, State_Mimic</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>include/FSM/*.h · robots/g1/src/State_*.cpp · include/LinearInterpolator.h</h4><span class="pill cpp">C++</span></div>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">CtrlFSM(cfg)</td><td>config["FSM"] → object</td><td>Builds every enabled state by name through the REGISTER_FSM factory map.</td><td>getFsmMap, FSMStringMap</td></tr>
+        <tr><td class="fn">CtrlFSM::start / run_</td><td>— → None</td><td>1 kHz loop: pre_run, run, post_run, then evaluate transition checks.</td><td>current state</td></tr>
+        <tr><td class="fn">BaseState</td><td>class</td><td>Life-cycle hooks enter / pre_run / run / post_run / exit and <code>registered_checks</code>.</td><td>CtrlFSM</td></tr>
+        <tr><td class="fn">FSMState(id, name)</td><td>config transitions → checks</td><td>Compiles joystick expressions into checks; adds "LowState timeout → Passive". Shares lowcmd, lowstate, keyboard.</td><td>unitree_joystick_dsl.hpp</td></tr>
+        <tr><td class="fn">State_Passive</td><td>config mode, kd</td><td>kp = 0, damping only, target = current angle.</td><td>start and fallback state</td></tr>
+        <tr><td class="fn">State_FixStand</td><td>config kp, kd, ts, qs</td><td>Interpolates joints to the standing pose over 2 s.</td><td>linear_interpolate</td></tr>
+        <tr><td class="fn">linear_interpolate(t, ts, ys)</td><td>time, key times, key vectors → vector</td><td>Piecewise-linear interpolation, clamped at both ends.</td><td>State_FixStand</td></tr>
+        <tr><td class="fn">State_RLBase(id, name)</td><td>policy_dir → object</td><td>Creates ManagerBasedRLEnv from deploy.yaml and an OrtRunner for policy.onnx.</td><td>isaaclab:: classes</td></tr>
+        <tr><td class="fn">State_RLBase::enter / exit</td><td>— → None</td><td>Sets gains, starts / stops the 50 Hz policy thread calling env-&gt;step().</td><td>ManagerBasedRLEnv::step</td></tr>
+        <tr><td class="fn">State_RLBase::run</td><td>— → None</td><td>Copies processed actions into lowcmd via joint_ids_map.</td><td>ActionManager</td></tr>
+        <tr><td class="fn">State_Mimic (+ MotionLoader_)</td><td>policy_dir, motion_file, time window → object</td><td>Like RLBase but steps a C++ reference motion; returns to end_state when the clip ends.</td><td>motion_command, motion_anchor_ori_b observations</td></tr>
+        <tr><td class="fn">robot_quat_w / motion_anchor_quat_w</td><td>env / loader → quaternion</td><td>Torso orientation from pelvis IMU (or reference root) and the three waist joints.</td><td>motion_anchor_ori_b</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="filecard">
+    <div class="fhead"><h4>include/isaaclab/** · include/unitree_articulation.h</h4><span class="pill cpp">C++</span></div>
+    <p>A miniature C++ copy of the mjlab manager design, so the robot computes observations and actions the same way training did.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">ManagerBasedRLEnv(cfg, robot)</td><td>deploy.yaml, Articulation → object</td><td>Stores step_dt, joint map, default pose, gains; builds action and observation managers.</td><td>State_RLBase, State_Mimic</td></tr>
+        <tr><td class="fn">ManagerBasedRLEnv::step()</td><td>— → None</td><td>robot.update → observations → alg.act → process_action.</td><td>policy thread</td></tr>
+        <tr><td class="fn">OrtRunner(model_path)</td><td>.onnx path → object</td><td>Loads the network with ONNX Runtime and reads input/output shapes.</td><td>Algorithms interface</td></tr>
+        <tr><td class="fn">OrtRunner::act(obs)</td><td>{name: vector} → vector</td><td>Runs inference; returns the action vector.</td><td>ManagerBasedRLEnv::step</td></tr>
+        <tr><td class="fn">ObservationManager::compute</td><td>— → {group: vector}</td><td>Evaluates every term in deploy.yaml order, clips, scales, keeps history, concatenates.</td><td>observations_map registry</td></tr>
+        <tr><td class="fn">REGISTER_OBSERVATION(name)</td><td>macro</td><td>Defines and registers an observation function by name.</td><td>observations.h, State_*.cpp</td></tr>
+        <tr><td class="fn">base_ang_vel, projected_gravity, joint_pos(_rel), joint_vel_rel, last_action, velocity_commands, gait_phase</td><td>(env, params) → vector</td><td>C++ twins of the training observation terms.</td><td>deploy.yaml observations</td></tr>
+        <tr><td class="fn">ObservationTermCfg</td><td>struct</td><td>Per-term params, scale, clip, history buffer (reset / add / get).</td><td>ObservationManager</td></tr>
+        <tr><td class="fn">ActionManager::process_action / processed_actions</td><td>raw vector → None / vector</td><td>Splits the raw action among terms; returns joint targets.</td><td>JointPositionAction</td></tr>
+        <tr><td class="fn">JointAction::process_actions(raw)</td><td>vector → None</td><td><code>clip(raw · scale + offset)</code>.</td><td>ActionManager</td></tr>
+        <tr><td class="fn">mdp::bad_orientation(env, limit)</td><td>→ bool</td><td>Meant to detect a fall; currently always false.</td><td>State_RLBase, State_Mimic checks</td></tr>
+        <tr><td class="fn">BaseArticulation::update()</td><td>LowState → ArticulationData</td><td>Copies IMU and motor data into policy order; computes projected gravity.</td><td>ManagerBasedRLEnv::step</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <h3 id="ref-sim" class="group-title">simulate/ <span class="pill cpp">sim-to-sim bridge</span></h3>
+
+  <div class="filecard">
+    <div class="fhead"><h4>src/main.cc · src/unitree_sdk2_bridge.h · config.yaml</h4><span class="pill cpp">C++</span></div>
+    <p>A MuJoCo viewer plus a bridge that speaks the robot's DDS protocol. Most of <code>main.cc</code> is MuJoCo's standard simulate sample; the project-specific part is the bridge.</p>
+    <div class="table-wrap"><table class="reftable">
+      <thead><tr><th>Function</th><th>Input → Output</th><th>What it does</th><th>Connects to</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">main()</td><td>config.yaml → runs UI</td><td>Loads the robot scene, starts the physics thread and the bridge thread, runs the render loop.</td><td>PhysicsThread, UnitreeSdk2BridgeThread</td></tr>
+        <tr><td class="fn">UnitreeSdk2BridgeThread</td><td>— → never returns</td><td>Waits for MuJoCo data, initialises DDS, starts G1Bridge (humanoids) or Go2Bridge.</td><td>RobotBridge</td></tr>
+        <tr><td class="fn">RobotBridge::run()</td><td>LowCmd + MuJoCo → torques + LowState</td><td>1 kHz: PD torques from commands, publishes motor, IMU, high-level state and gamepad.</td><td>deploy/ controller over DDS</td></tr>
+        <tr><td class="fn">G1Bridge::run()</td><td>→ None</td><td>Adds secondary IMU and battery messages, sets the 23/29-DoF mode flag.</td><td>RobotBridge::run</td></tr>
+        <tr><td class="fn">user_key_cb</td><td>key event → None</td><td>Backspace resets the sim; 7/8/9 control the elastic support band.</td><td>ElasticBand</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<section id="caveats" class="prose">
+  <h2>Things to watch out for</h2>
+  <p>Reading the code closely turned up a few behaviours that are easy to trip over. They are also noted in the source comments.</p>
+  <div class="callout warn">
+    <p><strong>play.py without <code>--checkpoint-file</code> crashes.</strong> The fallback branches read <code>cfg.wandb_run_path</code> and <code>cfg.registry_name</code>, which do not exist in <code>PlayConfig</code>, so you get an <code>AttributeError</code> instead of a helpful message. Always pass a checkpoint path, and a motion file for tracking tasks.</p>
+  </div>
+  <div class="callout warn">
+    <p><strong>The C++ fall detector is disabled.</strong> <code>mdp::bad_orientation()</code> in <code>deploy/include/isaaclab/envs/mdp/terminations.h</code> has its check commented out and always returns <code>false</code>. If the robot falls while running a policy, it will not switch to Passive by itself. Keep a hand on the <code>LT + B</code> combination.</p>
+  </div>
+  <div class="callout">
+    <p><strong>Some local classes are shadowed by mjlab's copies.</strong> <code>velocity_env_cfg.py</code> imports <code>UniformVelocityCommandCfg</code> and <code>tracking_env_cfg.py</code> imports <code>MotionCommandCfg</code> from mjlab, not from this repo's <code>mdp/</code>. The local files are near-identical copies, so behaviour matches, but editing the local command classes alone will not change training. Likewise, the G1 tracking config uses mjlab's built-in G1 asset rather than <code>src/assets/robots/unitree_g1</code>.</p>
+  </div>
+  <div class="callout">
+    <p><strong>Observation order is a contract.</strong> If you add, remove or reorder an observation term in a Python env config, you must update the matching <code>deploy.yaml</code> in the same order, or the network on the robot will receive scrambled inputs.</p>
+  </div>
+</section>
+
+<section id="glossary">
+  <h2>Glossary</h2>
+  <dl class="gloss">
+    <dt>policy / actor</dt><dd>The neural network that maps observations to actions. The only part copied to the robot.</dd>
+    <dt>critic</dt><dd>A second network that estimates future reward; used only during training and allowed privileged inputs.</dd>
+    <dt>PPO</dt><dd>Proximal Policy Optimization, the learning algorithm (from rsl_rl) that updates the networks.</dd>
+    <dt>episode</dt><dd>One attempt by one simulated robot, from reset until it falls or time runs out.</dd>
+    <dt>decimation</dt><dd>Number of physics steps per policy step (4 here: 200 Hz physics, 50 Hz policy).</dd>
+    <dt>MJCF</dt><dd>MuJoCo's XML format describing a robot's links, joints, meshes and sensors.</dd>
+    <dt>DoF</dt><dd>Degrees of freedom; here the number of actuated joints (G1 has 29 or 23).</dd>
+    <dt>PD controller</dt><dd>Motor law <code>τ = kp·(q* − q) + kd·(dq* − dq)</code>; the policy sets the target angle q*.</dd>
+    <dt>anchor body</dt><dd>The body used as reference frame for imitation; the G1 torso.</dd>
+    <dt>domain randomisation</dt><dd>Randomising friction, mass, sensor bias and pushes in simulation so the policy copes with the real world.</dd>
+    <dt>curriculum</dt><dd>Gradually raising task difficulty (terrain roughness, speed range) as the robot improves.</dd>
+    <dt>ONNX</dt><dd>A portable file format for neural networks, run on the robot with ONNX Runtime.</dd>
+    <dt>DDS</dt><dd>The publish/subscribe network protocol Unitree robots use for <code>LowCmd</code> and <code>LowState</code> messages.</dd>
+    <dt>FSM</dt><dd>Finite state machine; the deployment program's safe sequence of modes.</dd>
+    <dt>sim2sim / sim2real</dt><dd>Testing the deployment program first against a separate simulator, then on the physical robot.</dd>
+  </dl>
+</section>
+
+<footer>
+  Generated from a full read of the repository at commit 1425b15. Paths are relative to the project root, so the GIFs load when this file is opened from its place in the repo.
+</footer>
+
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+(function () {
+  var css = getComputedStyle(document.documentElement);
+  function tok(name) { return css.getPropertyValue(name).trim(); }
+  var colors = { "@py": tok("--py"), "@cpp": tok("--cpp"), "@data": tok("--data") };
+  var figures = document.querySelectorAll("figure.diagram");
+  var sources = [];
+  figures.forEach(function (fig) {
+    var src = fig.querySelector('script[type="text/x-mermaid"]');
+    if (!src) return;
+    var text = src.textContent.trim();
+    Object.keys(colors).forEach(function (k) { text = text.split(k).join(colors[k]); });
+    var pre = document.createElement("pre");
+    pre.className = "mermaid";
+    pre.textContent = text;
+    fig.insertBefore(pre, fig.querySelector("figcaption"));
+    sources.push({ pre: pre, text: text });
+  });
+  function fallback() {
+    sources.forEach(function (s) { s.pre.className = "fallback"; s.pre.textContent = s.text; });
+  }
+  if (!window.mermaid) { fallback(); return; }
+  try {
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "loose",
+      theme: "base",
+      themeVariables: {
+        background: tok("--surface"),
+        primaryColor: tok("--surface"),
+        primaryTextColor: tok("--ink"),
+        primaryBorderColor: tok("--muted"),
+        secondaryColor: tok("--code-bg"),
+        tertiaryColor: tok("--bg"),
+        lineColor: tok("--muted"),
+        textColor: tok("--ink"),
+        clusterBkg: tok("--bg"),
+        clusterBorder: tok("--line"),
+        edgeLabelBackground: tok("--surface"),
+        noteBkgColor: tok("--code-bg"),
+        noteTextColor: tok("--ink"),
+        noteBorderColor: tok("--line"),
+        fontFamily: "IBM Plex Sans, Segoe UI, sans-serif",
+        fontSize: "14px"
+      },
+      flowchart: { htmlLabels: true, curve: "basis", useMaxWidth: false },
+      state: { useMaxWidth: false }
+    });
+    window.mermaid.run({ querySelector: "pre.mermaid" }).catch(fallback);
+  } catch (e) { fallback(); }
+})();
+</script>
+</body>
+</html>

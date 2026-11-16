@@ -6,6 +6,12 @@
 #include <vector>
 #include <cassert>
 
+// linear_interpolate(t, ts, ys)
+//   Inputs : t  = query time (s); ts = increasing key-frame times (size N >= 2);
+//            ys = N key-frame vectors of equal length (e.g. joint angles).
+//   Output : vector = ys[i]*(1-a) + ys[i+1]*a where ts[i] <= t <= ts[i+1];
+//            clamps to ys[0] before ts[0] and ys[N-1] after ts[N-1].
+//   Used by: State_FixStand::run().
 inline std::vector<float> linear_interpolate(float t, const std::vector<float>& ts, const std::vector<std::vector<float>>& ys)
 {
     assert(ts.size() == ys.size() && !ys.empty() && ts.size() > 1 && ys[0].size() > 0);

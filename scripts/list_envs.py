@@ -12,8 +12,14 @@ from mjlab.tasks.registry import list_tasks
 def list_environments(keyword: str | None = None):
   """List all registered environments.
 
-  Args:
-    keyword: Optional filter to only show environments containing this keyword.
+  Input:
+    keyword: Optional filter to only show environments containing this keyword
+             (case-insensitive), e.g. "G1".
+  Output:
+    int = number of task ids printed. Prints a PrettyTable "# | Task ID".
+
+  How it works: the imports at the top (`mjlab.tasks`, `src.tasks`) register every
+  task; list_tasks() returns their ids, which are filtered and printed.
   """
   table = PrettyTable(["#", "Task ID"])
   table.title = "Available Environments in mjlab"
@@ -42,6 +48,7 @@ def list_environments(keyword: str | None = None):
 
 
 def main():
+  """CLI entry point: `python scripts/list_envs.py [--keyword G1]`."""
   return tyro.cli(list_environments, config=mjlab.TYRO_FLAGS)
 
 

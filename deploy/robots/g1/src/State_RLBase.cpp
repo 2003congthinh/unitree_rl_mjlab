@@ -8,6 +8,8 @@ namespace isaaclab
 {
 // keyboard velocity commands example
 // change "velocity_commands" observation name in policy deploy.yaml to "keyboard_velocity_commands"
+// Output: {vx, vy, wz} = unit command for keys w/s (forward/back), a/d (left/right),
+// q/e (turn left/right); zeros otherwise.
 REGISTER_OBSERVATION(keyboard_velocity_commands)
 {
     std::string key = FSMState::keyboard->key();
@@ -31,8 +33,14 @@ REGISTER_OBSERVATION(keyboard_velocity_commands)
 
 }
 
+// Constructor
+//   Inputs : state id, state name (e.g. "Velocity"); reads config["FSM"][name]["policy_dir"].
+//   Output : none. Builds isaaclab::ManagerBasedRLEnv from params/deploy.yaml (joint map,
+//            gains, default pose, observation + action terms) with a BaseArticulation that
+//            reads FSMState::lowstate, attaches an OrtRunner(exported/policy.onnx), and
+//            registers a bad-orientation -> Passive safety check.
 State_RLBase::State_RLBase(int state_mode, std::string state_string)
-: FSMState(state_mode, state_string) 
+: FSMState(state_mode, state_string)
 {
     auto cfg = param::config["FSM"][state_string];
     auto policy_dir = param::parser_policy_dir(cfg["policy_dir"].as<std::string>());
@@ -51,6 +59,8 @@ State_RLBase::State_RLBase(int state_mode, std::string state_string)
     );
 }
 
+// run() (1 kHz): copy processed actions (target joint angles, policy order) into lowcmd,
+// using joint_ids_map[i] to convert policy joint index -> SDK motor index.
 void State_RLBase::run()
 {
     auto action = env->action_manager->processed_actions();
