@@ -116,7 +116,7 @@ class MotionTrackingOnPolicyRunner(MjlabOnPolicyRunner):
     """
     super().save(path, infos)
     policy_path = path.split("model")[0]
-    filename = policy_path.split("/")[-2] + ".onnx"
+    filename = policy_path.replace("\\", "/").split("/")[-2] + ".onnx"
     self.export_motion_policy_to_onnx(policy_path, filename)
     self.export_policy_to_onnx(policy_path, "policy.onnx")
     run_name: str = (
