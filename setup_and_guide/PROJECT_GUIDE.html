@@ -198,6 +198,7 @@ footer { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--line
     <li class="sub"><a href="#ref-sim">simulate/</a></li>
     <li><a href="#caveats">Things to watch out for</a></li>
     <li><a href="#glossary">Glossary</a></li>
+    <li style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid var(--line)"><a href="G1_SETUP_NOTES.html">G1 setup log (Windows) →</a></li>
   </ol>
 </nav>
 
@@ -419,6 +420,7 @@ flowchart LR
     <figcaption>Data flow of motion imitation, from the CSV file to the feedback loop that chooses where the next practice episode starts.</figcaption>
   </figure>
   <div class="prose">
+    <div class="callout"><p>Setting this up on Windows with an 8 GB GPU took several version fixes. The full command log, with every error and its fix, is on its own page: <a href="G1_SETUP_NOTES.html">G1 motion tracking setup log</a>.</p></div>
     <p>There are two variants of the G1 task. <code>Unitree-G1-Tracking</code> lets the actor see the torso's position error and the body's linear velocity. A real robot cannot measure either reliably without a separate state estimator, so <code>Unitree-G1-Tracking-No-State-Estimation</code> removes them; that is the one meant for deployment. When saving, <code>MotionTrackingOnPolicyRunner</code> exports both a plain <code>policy.onnx</code> and a second ONNX file that embeds the whole reference motion.</p>
   </div>
 </section>
@@ -524,8 +526,8 @@ flowchart TB
   </div>
   <div class="gallery">
     <div class="gal-row">
-      <figure><img src="doc/gif/go2-velocity.gif" alt="Go2 quadruped trotting in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/go2-velocity.gif</code> · simulation</figcaption></figure>
-      <figure><img src="doc/gif/go2-velocity-real.gif" alt="Real Go2 quadruped walking" loading="lazy"><figcaption><code>doc/gif/go2-velocity-real.gif</code> · real robot</figcaption></figure>
+      <figure><img src="../doc/gif/go2-velocity.gif" alt="Go2 quadruped trotting in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/go2-velocity.gif</code> · simulation</figcaption></figure>
+      <figure><img src="../doc/gif/go2-velocity-real.gif" alt="Real Go2 quadruped walking" loading="lazy"><figcaption><code>doc/gif/go2-velocity-real.gif</code> · real robot</figcaption></figure>
       <div class="gal-text">
         <h4>Go2 velocity tracking</h4>
         <p><span class="qa">Made by:</span> <code>play.py Unitree-Go2-Flat</code> (sim) and <code>deploy/robots/go2</code> (real).</p>
@@ -533,8 +535,8 @@ flowchart TB
       </div>
     </div>
     <div class="gal-row">
-      <figure><img src="doc/gif/g1-velocity.gif" alt="G1 humanoid walking in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/g1-velocity.gif</code> · simulation</figcaption></figure>
-      <figure><img src="doc/gif/g1-velocity-real.gif" alt="Real G1 humanoid walking" loading="lazy"><figcaption><code>doc/gif/g1-velocity-real.gif</code> · real robot</figcaption></figure>
+      <figure><img src="../doc/gif/g1-velocity.gif" alt="G1 humanoid walking in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/g1-velocity.gif</code> · simulation</figcaption></figure>
+      <figure><img src="../doc/gif/g1-velocity-real.gif" alt="Real G1 humanoid walking" loading="lazy"><figcaption><code>doc/gif/g1-velocity-real.gif</code> · real robot</figcaption></figure>
       <div class="gal-text">
         <h4>G1 velocity tracking</h4>
         <p><span class="qa">Made by:</span> <code>play.py Unitree-G1-Flat</code> (sim) and <code>g1_ctrl</code> in the Velocity state (real).</p>
@@ -542,8 +544,8 @@ flowchart TB
       </div>
     </div>
     <div class="gal-row">
-      <figure><img src="doc/gif/h1_2-velocity.gif" alt="H1_2 humanoid walking in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/h1_2-velocity.gif</code> · simulation</figcaption></figure>
-      <figure><img src="doc/gif/h1_2-velocity-real.gif" alt="Real H1_2 humanoid walking" loading="lazy"><figcaption><code>doc/gif/h1_2-velocity-real.gif</code> · real robot</figcaption></figure>
+      <figure><img src="../doc/gif/h1_2-velocity.gif" alt="H1_2 humanoid walking in the MuJoCo simulator" loading="lazy"><figcaption><code>doc/gif/h1_2-velocity.gif</code> · simulation</figcaption></figure>
+      <figure><img src="../doc/gif/h1_2-velocity-real.gif" alt="Real H1_2 humanoid walking" loading="lazy"><figcaption><code>doc/gif/h1_2-velocity-real.gif</code> · real robot</figcaption></figure>
       <div class="gal-text">
         <h4>H1_2 velocity tracking</h4>
         <p><span class="qa">Made by:</span> <code>play.py Unitree-H1_2-Flat</code> and <code>deploy/robots/h1_2</code>.</p>
@@ -551,8 +553,8 @@ flowchart TB
       </div>
     </div>
     <div class="gal-row">
-      <figure><img src="doc/gif/g1-mimic.gif" alt="G1 humanoid dancing in simulation" loading="lazy"><figcaption><code>doc/gif/g1-mimic.gif</code> · simulation</figcaption></figure>
-      <figure><img src="doc/gif/g1-mimic-real.gif" alt="Real G1 humanoid dancing" loading="lazy"><figcaption><code>doc/gif/g1-mimic-real.gif</code> · real robot</figcaption></figure>
+      <figure><img src="../doc/gif/g1-mimic.gif" alt="G1 humanoid dancing in simulation" loading="lazy"><figcaption><code>doc/gif/g1-mimic.gif</code> · simulation</figcaption></figure>
+      <figure><img src="../doc/gif/g1-mimic-real.gif" alt="Real G1 humanoid dancing" loading="lazy"><figcaption><code>doc/gif/g1-mimic-real.gif</code> · real robot</figcaption></figure>
       <div class="gal-text">
         <h4>G1 motion imitation (dance)</h4>
         <p><span class="qa">Made by:</span> <code>play.py Unitree-G1-Tracking-No-State-Estimation --motion_file=…dance1_subject2.npz</code> (sim) and <code>g1_ctrl</code> in the Mimic state (real).</p>
@@ -931,7 +933,7 @@ flowchart TB
 </section>
 
 <footer>
-  Generated from a full read of the repository at commit 1425b15. Paths are relative to the project root, so the GIFs load when this file is opened from its place in the repo.
+  Generated from a full read of the repository at commit 1425b15. Code paths in the text are relative to the project root. The GIFs load from <code>../doc/gif/</code>, so keep this file in <code>setup_and_guide/</code>.
 </footer>
 
 </main>

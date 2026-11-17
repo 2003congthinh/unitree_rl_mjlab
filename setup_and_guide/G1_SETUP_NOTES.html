@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>G1 Motion Tracking Setup Log</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: same system as PROJECT_GUIDE.html. Sticky contents on wide screens, one reading column.
+   Status colours: teal = works, red = failed, violet = not yet run. */
+:root {
+  --bg: #f4f7f8;
+  --surface: #ffffff;
+  --ink: #15222b;
+  --muted: #566875;
+  --line: #d6dfe4;
+  --code-bg: #e9eff2;
+  --py: #0a7a73;
+  --py-soft: #dcf1ef;
+  --cpp: #a85a17;
+  --cpp-soft: #f6e6d6;
+  --data: #6a4ca3;
+  --data-soft: #ebe4f7;
+  --warn: #9a3b2e;
+  --warn-soft: #f7e3df;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151a; --surface: #152029; --ink: #e2e9ee; --muted: #93a5b2; --line: #263540;
+    --code-bg: #1a2731; --py: #43c3b9; --py-soft: #12312f; --cpp: #e5a262; --cpp-soft: #3a2817;
+    --data: #ab93e3; --data-soft: #2a2140; --warn: #f0917f; --warn-soft: #3b1f1a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151a; --surface: #152029; --ink: #e2e9ee; --muted: #93a5b2; --line: #263540;
+  --code-bg: #1a2731; --py: #43c3b9; --py-soft: #12312f; --cpp: #e5a262; --cpp-soft: #3a2817;
+  --data: #ab93e3; --data-soft: #2a2140; --warn: #f0917f; --warn-soft: #3b1f1a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 1rem; line-height: 1.65; }
+a { color: var(--py); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--py); outline-offset: 2px; border-radius: 3px; }
+
+.shell {
+  display: grid; grid-template-columns: 1fr; gap: 2.5rem;
+  max-width: 1200px; margin: 0 auto; padding-block: 2rem 4rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (min-width: 1100px) {
+  .shell { grid-template-columns: 230px minmax(0, 1fr); }
+  nav.toc { position: sticky; top: 1.5rem; align-self: start; max-height: calc(100vh - 3rem); overflow-y: auto; }
+}
+nav.toc { font-size: 0.85rem; }
+nav.toc h2 { font-family: var(--font-display); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.5rem; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+nav.toc a { color: var(--ink); text-decoration: none; display: block; padding: 0.2rem 0.5rem; border-radius: 4px; }
+nav.toc a:hover { background: var(--code-bg); }
+nav.toc .sub a { padding-left: 1.2rem; color: var(--muted); }
+nav.toc .back { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+@media (max-width: 1099px) {
+  nav.toc { border: 1px solid var(--line); border-radius: 8px; padding: 1rem; background: var(--surface); }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+
+main { min-width: 0; }
+.prose { max-width: 72ch; }
+header.hero { border-bottom: 1px solid var(--line); padding-bottom: 1.8rem; margin-bottom: 0.5rem; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.85rem; color: var(--muted); letter-spacing: 0.04em; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; }
+h1 { font-size: 2.1rem; margin: 0.4rem 0 0.8rem; }
+h2 { font-size: 1.5rem; margin: 3.2rem 0 0.8rem; }
+h3 { font-size: 1.15rem; margin: 2.4rem 0 0.6rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.7rem; }
+h3 .num { font-family: var(--font-mono); font-size: 0.85rem; color: var(--muted); font-weight: 400; }
+p { margin: 0 0 1rem; }
+ul { margin: 0 0 1rem; padding-left: 1.3rem; }
+li { margin-bottom: 0.25rem; }
+.lede { font-size: 1.15rem; color: var(--muted); max-width: 64ch; }
+
+code { font-family: var(--font-mono); font-size: 0.86em; }
+:not(pre) > code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; }
+.chip { font-family: var(--font-mono); font-size: 0.78rem; padding: 0.15rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+
+.pill { display: inline-flex; align-items: center; font-family: var(--font-body); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.1rem 0.55rem; border-radius: 999px; white-space: nowrap; }
+.pill.ok { background: var(--py-soft); color: var(--py); }
+.pill.fail { background: var(--warn-soft); color: var(--warn); }
+.pill.todo { background: var(--data-soft); color: var(--data); }
+.pill.info { background: var(--code-bg); color: var(--muted); }
+
+.status { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem; margin: 1.4rem 0 0.5rem; }
+.status div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 0.9rem; display: grid; gap: 0.3rem; align-content: start; }
+.status strong { font-family: var(--font-display); font-size: 0.95rem; }
+.status span.note { font-size: 0.82rem; color: var(--muted); }
+
+.code { margin: 0.6rem 0 0.4rem; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
+.code .bar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.3rem 0.5rem 0.3rem 0.8rem; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.code .bar .left { display: flex; align-items: center; gap: 0.6rem; }
+.code button { font: 600 0.72rem var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 0.15rem 0.6rem; cursor: pointer; }
+.code button:hover { border-color: var(--muted); }
+.code pre { margin: 0; padding: 0.8rem 1rem; overflow-x: auto; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.55; }
+.code + p.explain { color: var(--ink); }
+p.explain { max-width: 72ch; }
+
+.table-wrap { overflow-x: auto; margin: 0.8rem 0 1.4rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; line-height: 1.5; }
+th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: none; }
+th { font-family: var(--font-display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); background: var(--code-bg); white-space: nowrap; }
+td.mono { font-family: var(--font-mono); font-size: 0.8rem; white-space: nowrap; }
+td.id { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+td.err { font-family: var(--font-mono); font-size: 0.78rem; color: var(--warn); min-width: 16rem; }
+td.pin { font-weight: 600; color: var(--py); }
+.bugs td:nth-child(3) { min-width: 14rem; }
+.bugs td:nth-child(4) { min-width: 14rem; }
+
+.callout { border-left: 3px solid var(--py); background: var(--surface); padding: 0.8rem 1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; max-width: 72ch; }
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.callout.todo { border-left-color: var(--data); }
+.callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
+.facts div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 0.9rem; font-size: 0.9rem; }
+.facts strong { display: block; font-family: var(--font-display); margin-bottom: 0.2rem; }
+
+footer { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#status">Where things stand</a></li>
+    <li><a href="#versions">1 · Working library versions</a></li>
+    <li><a href="#bugs">2 · Bug-fix summary</a></li>
+    <li><a href="#log">3 · Commands in order</a></li>
+    <li class="sub"><a href="#s3-1">3.1 Hugging Face login</a></li>
+    <li class="sub"><a href="#s3-2">3.2 Download metadata</a></li>
+    <li class="sub"><a href="#s3-3">3.3 Inspect metadata</a></li>
+    <li class="sub"><a href="#s3-4">3.4 explore.py</a></li>
+    <li class="sub"><a href="#s3-5">3.5 filter.py</a></li>
+    <li class="sub"><a href="#s3-6">3.6 First conversion</a></li>
+    <li class="sub"><a href="#s3-7">3.7 Fix 1 · MuJoCo</a></li>
+    <li class="sub"><a href="#s3-8">3.8 Fix 2 · scipy</a></li>
+    <li class="sub"><a href="#s3-9">3.9 Fix 3 · PyTorch</a></li>
+    <li class="sub"><a href="#s3-10">3.10 Fixes 4 &amp; 5 · Warp</a></li>
+    <li class="sub"><a href="#s3-11">3.11 Training</a></li>
+    <li class="sub"><a href="#s3-12">3.12 Monitoring</a></li>
+    <li class="sub"><a href="#s3-13">3.13 Stop &amp; resume</a></li>
+    <li><a href="#next">4 · Next steps</a></li>
+    <li><a href="#git">5 · Git hygiene</a></li>
+    <li class="back"><a href="PROJECT_GUIDE.html">← Project guide</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="hero">
+  <div class="eyebrow">unitree_rl_mjlab · setup &amp; command log</div>
+  <h1>G1 motion tracking setup log</h1>
+  <p class="lede">Train an RL motion-tracking policy (PPO, BeyondMimic-style) for the Unitree G1 using <code>unitree_rl_mjlab</code>, with reference motions from BONES-SEED.</p>
+  <div class="chips" aria-label="Platform">
+    <span class="chip">Windows 11</span>
+    <span class="chip">cmd</span>
+    <span class="chip">conda env: unitree_rl_mjlab</span>
+    <span class="chip">RTX 4060 · 8 GB · sm_89</span>
+    <span class="chip">CUDA Toolkit 12.9 · Driver 13.3</span>
+  </div>
+</header>
+
+<section id="status">
+  <h2>Where things stand</h2>
+  <div class="status">
+    <div><span class="pill ok">Works</span><strong>Environment</strong><span class="note">Seven install errors fixed. Versions pinned in section 1.</span></div>
+    <div><span class="pill ok">Works</span><strong>Example conversion</strong><span class="note"><code>dance1_subject2.npz</code> produced.</span></div>
+    <div><span class="pill ok">Works</span><strong>Training</strong><span class="note">1024 envs, TensorBoard logging, checkpoints saving.</span></div>
+    <div><span class="pill todo">Not yet run</span><strong>Evaluate policy</strong><span class="note"><code>play.py</code> replay, section 4.1.</span></div>
+    <div><span class="pill todo">Not yet run</span><strong>BONES-SEED clip</strong><span class="note">Download, check format, convert, train. Sections 4.2–4.4.</span></div>
+  </div>
+</section>
+
+<section id="versions">
+  <h2>1 · Working library versions</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Version</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">Python</td><td class="mono">3.11</td><td>Recommended by the repo setup guide</td></tr>
+        <tr><td class="mono">mjlab</td><td class="mono">1.2.0</td><td>Pinned by <code>unitree_rl_mjlab</code>'s <code>setup.py</code></td></tr>
+        <tr><td class="mono">mujoco</td><td class="mono pin">3.5.0</td><td>4.x breaks <code>mujoco-warp</code> 3.5.0 (see <a href="#s3-7">Fix 1</a>)</td></tr>
+        <tr><td class="mono">mujoco-warp</td><td class="mono">3.5.0</td><td>GPU physics backend</td></tr>
+        <tr><td class="mono">warp-lang</td><td class="mono pin">1.12.0</td><td>1.19 too new, 1.11 too old (see <a href="#s3-10">Fixes 4–5</a>)</td></tr>
+        <tr><td class="mono">torch</td><td class="mono pin">CUDA build</td><td>Default Windows pip install is CPU-only (see <a href="#s3-9">Fix 3</a>)</td></tr>
+        <tr><td class="mono">scipy</td><td class="mono">1.17.1</td><td>Missing dependency (see <a href="#s3-8">Fix 2</a>)</td></tr>
+        <tr><td class="mono">huggingface_hub</td><td class="mono">2.4.0</td><td>CLI command is <code>hf</code>, not <code>huggingface-cli</code></td></tr>
+        <tr><td class="mono">pyarrow</td><td class="mono">latest</td><td>Needed by pandas to read <code>.parquet</code></td></tr>
+        <tr><td class="mono">tensorboard</td><td class="mono">with mjlab</td><td>Used instead of wandb (see <a href="#s3-11">Fix 6</a>)</td></tr>
+        <tr><td class="mono">numpy</td><td class="mono">2.4.6</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">Hardware and driver as reported by Warp: CUDA Toolkit 12.9, Driver 13.3, RTX 4060 8 GiB (sm_89). Highlighted versions are the ones that had to be pinned by hand.</p>
+  <p class="prose">Full snapshot of the working environment:</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>pip freeze &gt; requirements-working.txt</pre></div>
+  <p class="explain">Records every installed package with its exact version. Restore later with <code>pip install -r requirements-working.txt</code>.</p>
+</section>
+
+<section id="bugs">
+  <h2>2 · Bug-fix summary</h2>
+  <div class="table-wrap">
+    <table class="bugs">
+      <thead><tr><th>#</th><th>Error</th><th>Cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td class="id">0</td><td class="err">'huggingface-cli' is not recognized</td><td><code>huggingface_hub</code> 2.x renamed the CLI</td><td>Use <code>hf</code></td></tr>
+        <tr><td class="id">0b</td><td class="err">Unable to find a usable engine; tried 'pyarrow'</td><td>pandas can't read parquet alone</td><td><code>pip install pyarrow</code></td></tr>
+        <tr><td class="id">0c</td><td class="err">Filter returned 0 rows</td><td><code>content_props</code> uses <code>0</code> for "no props", not empty</td><td>Filter on <code>content_props.astype(str) == '0'</code></td></tr>
+        <tr><td class="id">1</td><td class="err">mjtEnableBit has no attribute 'mjENBL_MULTICCD'</td><td>mujoco 4.0.1 installed; mujoco-warp 3.5.0 expects 3.5</td><td>Uninstall mujoco 4 packages, install <code>mujoco==3.5.0</code></td></tr>
+        <tr><td class="id">2</td><td class="err">No module named 'scipy'</td><td>Missing dependency</td><td><code>pip install scipy</code></td></tr>
+        <tr><td class="id">3</td><td class="err">Torch not compiled with CUDA enabled</td><td>CPU-only torch</td><td>Install torch from the PyTorch CUDA index</td></tr>
+        <tr><td class="id">4</td><td class="err">module 'warp' has no attribute 'context'</td><td>warp-lang 1.19 removed <code>wp.context</code></td><td>Downgrade warp-lang</td></tr>
+        <tr><td class="id">5</td><td class="err">unsupported operand type(s) for |: 'type' and 'function'</td><td>warp-lang 1.11 is below mjlab's minimum (≥1.12)</td><td><code>pip install "warp-lang==1.12.0"</code></td></tr>
+        <tr><td class="id">6</td><td class="err">ValidationError ... start_method ... Extra inputs are not permitted</td><td>wandb too new for rsl_rl's logger</td><td>Train with <code>--agent.logger=tensorboard</code></td></tr>
+        <tr><td class="id">7</td><td class="err">IndexError: list index out of range in runner.py line 119</td><td>Path split on <code>/</code>; Windows uses <code>\</code></td><td>Normalize slashes before splitting (<a href="#s3-11">code</a>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="log">
+  <h2>3 · Commands in chronological order</h2>
+
+  <h3 id="s3-1"><span class="num">3.1</span> Hugging Face login</h3>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill fail">Failed</span></span><button type="button">Copy</button></div><pre>huggingface-cli login</pre></div>
+  <p class="explain">The old CLI name no longer exists in <code>huggingface_hub</code> 2.x.</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>pip show huggingface_hub</pre></div>
+  <p class="explain">Checks whether the package is installed and which version. Result: 2.4.0, installed in the conda env.</p>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>hf auth login
+hf auth whoami</pre></div>
+  <p class="explain">Logs in with a Hugging Face <strong>Read</strong> token (input is hidden when pasting), then confirms which account is logged in. The BONES-SEED license must be accepted on the dataset page first, or downloads return 403.</p>
+  <p class="explain">Fallback if <code>hf</code> is not on PATH:</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>python -c "from huggingface_hub import login; login()"</pre></div>
+
+  <h3 id="s3-2"><span class="num">3.2</span> Download BONES-SEED metadata</h3>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>hf download bones-studio/seed --repo-type dataset --include "metadata/*" --local-dir ..\bones-seed</pre></div>
+  <p class="explain">Downloads only the metadata folder (not the 23.5 GB motion archives) to a folder <strong>outside</strong> the git repo, so large data never gets committed.</p>
+
+  <h3 id="s3-3"><span class="num">3.3</span> Inspect the metadata</h3>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill fail">First run failed</span></span><button type="button">Copy</button></div><pre>python -c "import pandas as pd, glob; f=glob.glob(r'..\bones-seed\metadata\*.parquet')[0]; df=pd.read_parquet(f); print(df.shape); print(df.columns.tolist())"</pre></div>
+  <p class="explain">Loads the metadata table and prints its size and column names. The first run failed because pandas had no parquet engine.</p>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>pip install pyarrow</pre></div>
+  <p class="explain">Adds parquet support to pandas. Rerunning the command gave <code>(142220, 51)</code>: 142,220 motions, 51 columns.</p>
+  <p class="explain">Useful columns: <code>move_duration_frames</code>, <code>category</code>, <code>content_type_of_movement</code>, <code>content_body_position</code>, <code>content_props</code>, <code>is_mirror</code>, <code>is_neutral</code>, <code>content_short_description</code>, <code>move_g1_path</code>.</p>
+
+  <h3 id="s3-4"><span class="num">3.4</span> <code>explore.py</code> · value counts of key columns</h3>
+  <div class="code"><div class="bar"><span class="left">python</span><button type="button">Copy</button></div><pre>import pandas as pd, glob
+df = pd.read_parquet(glob.glob(r'..\bones-seed\metadata\*.parquet')[0])
+
+for c in ['package', 'category', 'content_type_of_movement',
+          'content_body_position', 'content_props', 'is_mirror', 'is_neutral']:
+    print(f'\n== {c} ==')
+    print(df[c].value_counts(dropna=False).head(15))
+
+print('\nmean frames:', df.move_duration_frames.mean())</pre></div>
+  <p class="explain">Shows what values each column actually contains, so filters can be written correctly.</p>
+  <div class="facts">
+    <div><strong>content_props == 0</strong>means "no props".</div>
+    <div><strong>standing: 122k motions</strong><code>content_body_position == 'standing'</code> covers most of the dataset.</div>
+    <div><strong>120 fps</strong>Mean length is 875.8 frames, consistent with 120 fps for the SOMA data (288 h × 3600 × 120 / 142,220 ≈ 875).</div>
+  </div>
+
+  <h3 id="s3-5"><span class="num">3.5</span> <code>filter.py</code> · pick short, simple clips</h3>
+  <p class="explain">The first version returned 0 rows because it treated <code>content_props</code> as empty for "no props". Corrected version:</p>
+  <div class="code"><div class="bar"><span class="left">python <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>import pandas as pd, glob
+df = pd.read_parquet(glob.glob(r'..\bones-seed\metadata\*.parquet')[0])
+
+sel = df[
+    (df.is_mirror.astype(str).str.lower() == 'false')          # skip mirrored duplicates
+    &amp; (df.content_props.astype(str) == '0')                    # 0 = no props
+    &amp; (df.content_body_position == 'standing')                 # upright only
+    &amp; (df.is_neutral == 1)                                     # neutral style, no acting
+    &amp; (df.move_duration_frames.between(360, 720))              # 3-6 s at 120 fps
+    &amp; (df.content_type_of_movement.isin(['walking', 'gesture', 'standing idle']))
+]
+print('matches:', len(sel))
+
+cols = ['move_name', 'move_duration_frames', 'content_type_of_movement',
+        'content_short_description', 'move_g1_path']
+print(sel[cols].sample(min(20, len(sel)), random_state=0).to_string())</pre></div>
+  <p class="explain">Result: 6,984 matching clips. Chosen first candidate: <code>walk_ff_loop_180_R_003__A067</code> ("strolling forward", 523 frames), path <code>g1/csv/221117/walk_ff_loop_180_R_003__A067.csv</code>.</p>
+  <div class="callout"><p><code>move_g1_path</code> is relative to the dataset root and points <strong>inside <code>g1.tar.gz</code></strong>. The file isn't on disk until the archive is downloaded and extracted (see <a href="#s4-2">4.2</a>).</p></div>
+
+  <h3 id="s3-6"><span class="num">3.6</span> First conversion attempt (example clip)</h3>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill fail">Failed · Fix 1</span></span><button type="button">Copy</button></div><pre>python scripts/csv_to_npz.py --input-file src/assets/motions/g1/dance1_subject2.csv --output-name dance1_subject2.npz --input-fps 30 --output-fps 50 --robot g1</pre></div>
+  <p class="explain">Converts the repo's bundled example motion (30 fps CSV of G1 joint angles) into the 50 Hz <code>.npz</code> format the trainer uses, computing body positions and velocities via forward kinematics. The example was used first because it is already in the correct format, so any error comes from the environment, not the data. It failed with <code>mjENBL_MULTICCD</code>.</p>
+  <div class="callout"><p><strong>Windows <code>cmd</code> note:</strong> <code>\</code> line continuations from Linux docs don't work in <code>cmd</code>. Write commands on one line, or use <code>^</code>.</p></div>
+
+  <h3 id="s3-7"><span class="num">3.7</span> Fix 1 · MuJoCo version mismatch</h3>
+  <div class="code"><div class="bar"><span class="left">bat · diagnose</span><button type="button">Copy</button></div><pre>pip show mujoco mujoco-warp mjlab warp-lang
+pip check
+python -c "import importlib.metadata as m; print([r for r in m.requires('mjlab') if 'mujoco' in r.lower() or 'warp' in r.lower()])"</pre></div>
+  <p class="explain">Shows installed versions, checks for declared conflicts, and prints what mjlab requires. Result: mujoco 4.0.1 vs mujoco-warp 3.5.0. mjlab only requires <code>mujoco&gt;=3.5.0</code> (no upper bound), so pip had installed 4.x.</p>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>pip uninstall -y mujoco mujoco-core mujoco-studio
+pip install "mujoco==3.5.0"
+python -c "import mujoco, mujoco_warp; print(mujoco.__version__, 'ok')"</pre></div>
+  <p class="explain">Removes MuJoCo 4 (which is split into three packages), installs 3.5.0, and checks both libraries import. Result: <code>3.5.0 ok</code>.</p>
+
+  <h3 id="s3-8"><span class="num">3.8</span> Fix 2 · missing scipy</h3>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>pip install scipy</pre></div>
+  <p class="explain">mjlab's terrain module imports <code>scipy.interpolate</code>, which wasn't installed.</p>
+
+  <h3 id="s3-9"><span class="num">3.9</span> Fix 3 · CPU-only PyTorch</h3>
+  <div class="code"><div class="bar"><span class="left">bat · diagnose</span><button type="button">Copy</button></div><pre>nvidia-smi
+python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"</pre></div>
+  <p class="explain">Shows the GPU and the highest CUDA version the driver supports, and whether torch can use the GPU.</p>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>pip uninstall -y torch
+pip install torch --index-url https://download.pytorch.org/whl/cuXXX
+python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0))"</pre></div>
+  <p class="explain">Replaces the CPU build with a CUDA build. Take the exact <code>cuXXX</code> from pytorch.org → Get Started, at or below the driver's CUDA version. The check should print <code>True</code> and <code>NVIDIA GeForce RTX 4060</code>.</p>
+
+  <h3 id="s3-10"><span class="num">3.10</span> Fixes 4 &amp; 5 · Warp version</h3>
+  <p class="explain"><span class="pill fail">Failed</span> warp-lang 1.19.0 → <code>no attribute 'context'</code> (too new).</p>
+  <div class="code"><div class="bar"><span class="left">bat · diagnose</span><button type="button">Copy</button></div><pre>python -c "import importlib.metadata as m; print([r for r in m.requires('mujoco-warp') if 'warp' in r.lower()])"</pre></div>
+  <p class="explain">Prints the Warp version that <code>mujoco-warp</code> needs, to choose a version that satisfies both packages.</p>
+  <p class="explain"><span class="pill fail">Failed</span> warp-lang 1.11.0 → <code>unsupported operand type(s) for |</code> (below mjlab's minimum of 1.12).</p>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill ok">Works</span></span><button type="button">Copy</button></div><pre>pip install "warp-lang==1.12.0"</pre></div>
+  <p class="explain">Installs the version that works with both mjlab 1.2.0 and mujoco-warp 3.5.0. The <code>warp.context ... will soon be removed</code> DeprecationWarning is harmless.</p>
+  <div class="callout"><p>After this, conversion succeeded and produced <code>src/assets/motions/g1/dance1_subject2.npz</code>.</p></div>
+
+  <h3 id="s3-11"><span class="num">3.11</span> Training</h3>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill fail">Failed · Fix 6</span></span><button type="button">Copy</button></div><pre>python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1/dance1_subject2.npz --env.scene.num-envs=1024</pre></div>
+  <p class="explain">Trains a PPO tracking policy on the motion with 1024 parallel simulated robots. The README's 4096 doesn't fit well in 8 GB VRAM. The first run spends a few minutes compiling GPU kernels. It failed at logger setup (wandb).</p>
+  <div class="code"><div class="bar"><span class="left">bat <span class="pill fail">Failed · Fix 7</span></span><button type="button">Copy</button></div><pre>python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1/dance1_subject2.npz --env.scene.num-envs=1024 --agent.logger=tensorboard</pre></div>
+  <p class="explain">Same training, logging to TensorBoard (no account needed) instead of wandb. It failed when saving the first checkpoint. Fix in <code>src\tasks\tracking\rl\runner.py</code>, line 119:</p>
+  <div class="code"><div class="bar"><span class="left">python <span class="pill ok">Applied</span></span><button type="button">Copy</button></div><pre># before (breaks on Windows paths with backslashes)
+filename = policy_path.split("/")[-2] + ".onnx"
+
+# after
+filename = policy_path.replace("\\", "/").split("/")[-2] + ".onnx"</pre></div>
+  <p class="explain">Converts Windows <code>\</code> to <code>/</code> before splitting, so the ONNX file is named after the run folder as on Linux. The fix is present in the current <code>runner.py</code> at line 119.</p>
+  <p class="explain">Check for other path splits with the same problem:</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>findstr /s /n /c:"split(" src\*.py scripts\*.py</pre></div>
+  <div class="callout"><p>After this, training runs. Checkpoints go to <code>logs\rsl_rl\g1_tracking\&lt;date_time&gt;\model_&lt;iter&gt;.pt</code>, and <code>policy.onnx</code> is exported for deployment.</p></div>
+
+  <p class="explain"><strong>What the training printout shows</strong> (useful for the report):</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Action (29)</strong></td><td>Target joint positions for the G1's 29 joints.</td></tr>
+        <tr><td><strong>Actor observations (154)</strong></td><td>Reference command (58), anchor orientation, angular velocity, joint pos/vel, last action. What the real robot can sense.</td></tr>
+        <tr><td><strong>Critic observations (286)</strong></td><td>Actor inputs plus simulator-only body positions/orientations and linear velocity (asymmetric actor-critic).</td></tr>
+        <tr><td><strong>Rewards</strong></td><td>Root and body position/orientation/velocity tracking (weights 0.5–1.0), penalties for action rate (−0.1), joint limits (−10), self-collisions (−10).</td></tr>
+        <tr><td><strong>Terminations</strong></td><td>Timeout, or drifting too far from the reference (anchor position/orientation, end-effector position).</td></tr>
+        <tr><td><strong>Domain randomization</strong></td><td>Random pushes every 1–3 s, center-of-mass offset, encoder bias, foot friction.</td></tr>
+        <tr><td><strong>Networks</strong></td><td>Actor and critic MLPs, 512 → 256 → 128, ELU.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="explain"><code>num-envs</code> is the number of parallel robot copies, not a dataset to cover. Fewer environments means fewer samples per iteration, not missing data.</p>
+
+  <h3 id="s3-12"><span class="num">3.12</span> Monitoring (second terminal, while training)</h3>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>tensorboard --logdir logs\rsl_rl\g1_tracking</pre></div>
+  <p class="explain">Serves training curves at <code>http://localhost:6006</code>. Watch mean reward and mean episode length; stop training (Ctrl+C) when they plateau.</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --help | findstr /i iter</pre></div>
+  <p class="explain">Finds the flag that sets the maximum number of training iterations.</p>
+
+  <h3 id="s3-13"><span class="num">3.13</span> Stopping and resuming training</h3>
+  <p class="explain"><strong>Where checkpoints are stored.</strong> Each run gets its own timestamped folder:</p>
+  <div class="code"><div class="bar"><span class="left">path</span><button type="button">Copy</button></div><pre>logs\rsl_rl\g1_tracking\&lt;date_time&gt;\model_&lt;iter&gt;.pt</pre></div>
+  <p class="explain">For example <code>logs\rsl_rl\g1_tracking\2026-11-17_22-15-40\model_1500.pt</code>.</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>dir /s /b logs\rsl_rl\g1_tracking\*.pt</pre></div>
+  <p class="explain">Lists every saved checkpoint across all runs. The highest-numbered file in a folder is that run's latest policy.</p>
+  <div class="callout warn"><p>Checkpoints are saved <strong>every N iterations</strong> (the config's save interval), not continuously. After Ctrl+C, progress since the last saved <code>model_&lt;iter&gt;.pt</code> is lost.</p></div>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --help | findstr /i "save resume load"</pre></div>
+  <p class="explain">Shows the save interval and the exact names of the resume flags.</p>
+  <p class="explain"><strong>Resuming.</strong> The README lists <code>--agent.resume</code>. In rsl_rl-style configs it works with:</p>
+  <ul class="prose">
+    <li><code>resume</code>: turn resuming on</li>
+    <li><code>load-run</code>: which run folder to load (default usually the latest run)</li>
+    <li><code>load-checkpoint</code>: which file in it (default usually the latest <code>model_*.pt</code>)</li>
+  </ul>
+  <p class="explain">Resume from the latest run and checkpoint:</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1/dance1_subject2.npz --env.scene.num-envs=1024 --agent.logger=tensorboard --agent.resume=True</pre></div>
+  <p class="explain">Resume from a specific run and checkpoint:</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1/dance1_subject2.npz --env.scene.num-envs=1024 --agent.logger=tensorboard --agent.resume=True --agent.load-run=2026-11-17_22-15-40 --agent.load-checkpoint=model_1500.pt</pre></div>
+  <p class="explain"><code>load-run</code> and <code>load-checkpoint</code> are best guesses from similar configs; use the spelling shown by <code>--help</code>.</p>
+  <div class="callout">
+    <p><strong>Keep the same when resuming:</strong></p>
+    <ul>
+      <li><strong>Motion file.</strong> A new clip should be a new training run, not a resume.</li>
+      <li><strong>Task name</strong>, so the network input/output shapes match.</li>
+      <li><code>num-envs</code> can change, but keeping it the same makes curves easier to compare.</li>
+    </ul>
+  </div>
+  <p class="explain"><strong>What to expect:</strong> resuming usually creates a <strong>new</strong> timestamped folder that continues the iteration count from the loaded checkpoint. TensorBoard shows both runs, with the curve picking up where it stopped. A path error during resume is likely the same Windows <code>/</code> vs <code>\</code> issue as Fix 7.</p>
+</section>
+
+<section id="next">
+  <h2>4 · Next steps <span class="pill todo">Not yet run</span></h2>
+
+  <h3 id="s4-1"><span class="num">4.1</span> Evaluate the policy</h3>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>dir /s /b logs\rsl_rl\g1_tracking\*.pt
+python scripts/play.py Unitree-G1-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1/dance1_subject2.npz --checkpoint_file=logs/rsl_rl/g1_tracking/&lt;run_folder&gt;/model_&lt;iter&gt;.pt</pre></div>
+  <p class="explain">Lists saved checkpoints, then replays the trained policy in a MuJoCo viewer. May hit the same <code>split("/")</code> Windows bug.</p>
+
+  <h3 id="s4-2"><span class="num">4.2</span> Get a BONES-SEED G1 clip</h3>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>hf download bones-studio/seed g1/csv/221117/walk_ff_loop_180_R_003__A067.csv --repo-type dataset --local-dir ..\bones-seed</pre></div>
+  <p class="explain">Tries to download one CSV directly. If it's not available as a single file:</p>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>hf download bones-studio/seed g1.tar.gz --repo-type dataset --local-dir ..\bones-seed
+cd ..\bones-seed
+tar -tzf g1.tar.gz | findstr walk_ff_loop_180_R_003__A067
+tar -xzf g1.tar.gz g1/csv/221117/walk_ff_loop_180_R_003__A067.csv</pre></div>
+  <p class="explain">Downloads the 23.5 GB archive (check disk space first), finds the exact path inside it, and extracts only the chosen clip.</p>
+
+  <h3 id="s4-3"><span class="num">4.3</span> Check the CSV format against the example</h3>
+  <div class="code"><div class="bar"><span class="left">python</span><button type="button">Copy</button></div><pre>import pandas as pd
+a = pd.read_csv(r'src\assets\motions\g1\dance1_subject2.csv', header=None, nrows=3)
+b = pd.read_csv(r'src\assets\motions\g1\walk_ff_loop_180_R_003__A067.csv', header=None, nrows=3)
+print('example:', a.shape); print(a.iloc[:, :8])
+print('bones:  ', b.shape); print(b.iloc[:, :8])
+print('bones total rows:', len(pd.read_csv(r'src\assets\motions\g1\walk_ff_loop_180_R_003__A067.csv', header=None)))</pre></div>
+  <p class="explain">Compares column count, header and value layout. If the BONES row count equals <code>move_duration_frames</code> (523), the CSV is 120 fps. If the layouts differ, a conversion script is needed before <code>csv_to_npz.py</code>.</p>
+
+  <h3 id="s4-4"><span class="num">4.4</span> Convert and train the BONES clip</h3>
+  <div class="code"><div class="bar"><span class="left">bat</span><button type="button">Copy</button></div><pre>python scripts/csv_to_npz.py --input-file src/assets/motions/g1/walk_ff_loop_180_R_003__A067.csv --output-name walk_ff_loop_180_R_003__A067.npz --input-fps 120 --output-fps 50 --robot g1
+python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1/walk_ff_loop_180_R_003__A067.npz --env.scene.num-envs=1024 --agent.logger=tensorboard</pre></div>
+  <p class="explain">Same pipeline as the example; only the file name and <code>--input-fps</code> change. Confirm the FPS in <a href="#s4-3">4.3</a> first.</p>
+</section>
+
+<section id="git">
+  <h2>5 · Git hygiene</h2>
+  <p class="prose">Add to <code>.gitignore</code>:</p>
+  <div class="code"><div class="bar"><span class="left">gitignore</span><button type="button">Copy</button></div><pre>logs/
+*.npz</pre></div>
+  <p class="explain">Keep <code>bones-seed/</code> outside the repo folder. Large files committed by accident make pushes fail (GitHub rejects files over 100 MB).</p>
+</section>
+
+<footer>
+  Source: <code>unitree_g1_setup_notes.md</code>. For how the code itself works, see the <a href="PROJECT_GUIDE.html">project guide</a>.
+</footer>
+
+</main>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll(".code").forEach(function (block) {
+    var btn = block.querySelector("button");
+    var pre = block.querySelector("pre");
+    if (!btn || !pre) return;
+    btn.addEventListener("click", function () {
+      var text = pre.textContent;
+      function done(label) {
+        btn.textContent = label;
+        setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+      }
+      function selectText() {
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        done("Press Ctrl+C");
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done("Copied"); }, selectText);
+      } else {
+        selectText();
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
